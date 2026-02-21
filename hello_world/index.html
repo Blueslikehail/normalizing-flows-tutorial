@@ -478,6 +478,29 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.5);
       transition: transform 0.1s;
     }
+    /* Camera */
+    .cam-preview { width: 100%; border-radius: 0.8rem; background: #000; display: block; aspect-ratio: 4/3; object-fit: cover; }
+    .cam-snap    { width: 100%; height: auto; border-radius: 0.8rem; margin-top: 0.5rem; display: none; }
+    .cam-controls { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .cam-controls button { flex: 1; padding: 0.6rem; background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 0.7rem; color: #fff; font-size: 0.82rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    /* Microphone */
+    .mic-vol-track { height: 10px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden; margin: 0.6rem 0; }
+    .mic-vol-fill  { height: 100%; width: 0%; background: linear-gradient(90deg, #30d158, #ff9f0a, #ff453a); border-radius: 5px; transition: width 0.05s; }
+    .mic-fft-canvas { width: 100%; height: 80px; border-radius: 0.8rem; background: rgba(255,255,255,0.04); display: block; margin-top: 0.5rem; }
+    /* Touch pad */
+    .touch-pad {
+      width: 100%; aspect-ratio: 3/2;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      border-radius: 0.8rem; position: relative; overflow: hidden;
+      touch-action: none; margin-top: 0.5rem; cursor: crosshair;
+      user-select: none; -webkit-user-select: none;
+    }
+    .touch-dot {
+      position: absolute; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #0a84ff, #0040c0);
+      transform: translate(-50%,-50%); pointer-events: none;
+      box-shadow: 0 0 12px rgba(10,132,255,0.5);
+    }
   </style>
 </head>
 <body>
@@ -860,6 +883,62 @@
         </div>
       </div>
 
+      <hr class="section-sep">
+
+      <!-- Camera -->
+      <div class="sensor-section">
+        <div class="sensor-section-title">Camera</div>
+        <button class="sensor-perm-btn" id="cam-btn" onclick="startCamera()">Enable Camera</button>
+        <div id="cam-body" style="display:none">
+          <video id="cam-preview" class="cam-preview" autoplay playsinline muted></video>
+          <div class="cam-controls">
+            <button onclick="snapPhoto()">📸 Snapshot</button>
+            <button onclick="flipCamera()">🔄 Flip</button>
+            <button onclick="stopCamera()">⏹ Stop</button>
+          </div>
+          <img id="cam-snap" class="cam-snap" alt="snapshot">
+          <div class="sensor-grid" style="margin-top:0.6rem">
+            <div class="sensor-card"><div class="s-val" id="cam-w">—</div><div class="s-lbl">Width px</div></div>
+            <div class="sensor-card"><div class="s-val" id="cam-h">—</div><div class="s-lbl">Height px</div></div>
+            <div class="sensor-card"><div class="s-val" id="cam-fps">—</div><div class="s-lbl">FPS</div></div>
+            <div class="sensor-card"><div class="s-val" id="cam-facing">—</div><div class="s-lbl">Facing</div></div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-sep">
+
+      <!-- Microphone -->
+      <div class="sensor-section">
+        <div class="sensor-section-title">Microphone</div>
+        <button class="sensor-perm-btn" id="mic-btn" onclick="startMic()">Enable Microphone</button>
+        <div id="mic-body" style="display:none">
+          <div class="sensor-grid">
+            <div class="sensor-card"><div class="s-val" id="mic-db">—</div><div class="s-lbl">Volume dB</div></div>
+            <div class="sensor-card"><div class="s-val" id="mic-peak">—</div><div class="s-lbl">Peak dB</div></div>
+          </div>
+          <div class="mic-vol-track"><div class="mic-vol-fill" id="mic-vol-fill"></div></div>
+          <canvas id="mic-fft" class="mic-fft-canvas"></canvas>
+          <button class="sensor-perm-btn" style="margin-top:0.5rem;margin-bottom:0" onclick="stopMic()">Stop Microphone</button>
+        </div>
+      </div>
+
+      <hr class="section-sep">
+
+      <!-- Touch Pressure -->
+      <div class="sensor-section">
+        <div class="sensor-section-title">Touch Pressure</div>
+        <div class="sensor-grid">
+          <div class="sensor-card"><div class="s-val" id="touch-count">0</div><div class="s-lbl">Fingers</div></div>
+          <div class="sensor-card"><div class="s-val" id="touch-force">—</div><div class="s-lbl">Pressure</div></div>
+          <div class="sensor-card"><div class="s-val" id="touch-area">—</div><div class="s-lbl">Touch Area</div></div>
+          <div class="sensor-card"><div class="s-val" id="touch-max">0</div><div class="s-lbl">Max Fingers</div></div>
+        </div>
+        <div id="touch-pad" class="touch-pad">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted);font-size:0.75rem;pointer-events:none;text-align:center;line-height:1.6">Touch here<br>with multiple fingers</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1199,6 +1278,7 @@ function initSensors() {
   if (sensorsInited) return;
   sensorsInited = true;
   updateDeviceInfo();
+  initTouchPad();
   // Try auto-start motion (works on Android without a permission prompt)
   tryAutoMotion();
 }
@@ -1378,6 +1458,182 @@ function updateScreenOri() {
   } else {
     document.getElementById('scr-ori').textContent =
       window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+  }
+}
+
+/* ══════════════════════════════════════════
+   CAMERA
+══════════════════════════════════════════ */
+let camStream = null, camFacing = 'environment';
+
+function startCamera() {
+  const constraints = {
+    video: { facingMode: camFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  };
+  navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+    camStream = stream;
+    const vid = document.getElementById('cam-preview');
+    vid.srcObject = stream;
+    vid.onloadedmetadata = () => {
+      document.getElementById('cam-w').textContent = vid.videoWidth;
+      document.getElementById('cam-h').textContent = vid.videoHeight;
+    };
+    const settings = stream.getVideoTracks()[0].getSettings();
+    document.getElementById('cam-facing').textContent = settings.facingMode || camFacing;
+    // FPS counter via requestVideoFrameCallback or rAF fallback
+    let frames = 0, last = performance.now();
+    function countFps() {
+      if (!camStream) return;
+      frames++;
+      const now = performance.now();
+      if (now - last >= 1000) {
+        document.getElementById('cam-fps').textContent = frames;
+        frames = 0; last = now;
+      }
+      requestAnimationFrame(countFps);
+    }
+    requestAnimationFrame(countFps);
+    document.getElementById('cam-btn').style.display = 'none';
+    document.getElementById('cam-body').style.display = 'block';
+  }).catch(e => {
+    document.getElementById('cam-btn').textContent = 'Camera denied — ' + e.message;
+  });
+}
+
+function flipCamera() {
+  camFacing = camFacing === 'environment' ? 'user' : 'environment';
+  stopCamera();
+  setTimeout(startCamera, 200);
+}
+
+function snapPhoto() {
+  const vid = document.getElementById('cam-preview');
+  const canvas = document.createElement('canvas');
+  canvas.width = vid.videoWidth;
+  canvas.height = vid.videoHeight;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+  const img = document.getElementById('cam-snap');
+  img.src = canvas.toDataURL('image/jpeg', 0.85);
+  img.style.display = 'block';
+}
+
+function stopCamera() {
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  const vid = document.getElementById('cam-preview');
+  vid.srcObject = null;
+  document.getElementById('cam-btn').style.display = 'block';
+  document.getElementById('cam-btn').textContent = 'Enable Camera';
+  document.getElementById('cam-body').style.display = 'none';
+  document.getElementById('cam-snap').style.display = 'none';
+}
+
+/* ══════════════════════════════════════════
+   MICROPHONE
+══════════════════════════════════════════ */
+let micStream = null, micCtx = null, micAnalyser = null, micRaf = null, micPeak = -Infinity;
+
+function startMic() {
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+    micStream = stream;
+    micCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = micCtx.createMediaStreamSource(stream);
+    micAnalyser = micCtx.createAnalyser();
+    micAnalyser.fftSize = 256;
+    src.connect(micAnalyser);
+    micPeak = -Infinity;
+    document.getElementById('mic-btn').style.display = 'none';
+    document.getElementById('mic-body').style.display = 'block';
+    drawMic();
+  }).catch(e => {
+    document.getElementById('mic-btn').textContent = 'Mic denied — ' + e.message;
+  });
+}
+
+function stopMic() {
+  if (micRaf) { cancelAnimationFrame(micRaf); micRaf = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micCtx) { micCtx.close(); micCtx = null; }
+  micAnalyser = null;
+  document.getElementById('mic-btn').style.display = 'block';
+  document.getElementById('mic-body').style.display = 'none';
+}
+
+function drawMic() {
+  if (!micAnalyser) return;
+  const buf = new Uint8Array(micAnalyser.frequencyBinCount);
+  micAnalyser.getByteFrequencyData(buf);
+  // RMS -> dB
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  const rms = Math.sqrt(sum / buf.length);
+  const db = rms > 0 ? 20 * Math.log10(rms / 255) : -Infinity;
+  document.getElementById('mic-db').textContent = isFinite(db) ? db.toFixed(1) + ' dB' : '—';
+  if (db > micPeak) micPeak = db;
+  document.getElementById('mic-peak').textContent = isFinite(micPeak) ? micPeak.toFixed(1) + ' dB' : '—';
+  // Volume bar (maps -60 dB … 0 dB → 0 … 100%)
+  const pct = Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+  document.getElementById('mic-vol-fill').style.width = pct + '%';
+  // FFT bars on canvas
+  const canvas = document.getElementById('mic-fft');
+  const ctx = canvas.getContext('2d');
+  if (canvas.width !== canvas.offsetWidth) canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight || 80;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const barW = canvas.width / buf.length;
+  for (let i = 0; i < buf.length; i++) {
+    const h = (buf[i] / 255) * canvas.height;
+    ctx.fillStyle = `hsl(${200 + (i / buf.length) * 160},80%,55%)`;
+    ctx.fillRect(i * barW, canvas.height - h, Math.max(1, barW - 1), h);
+  }
+  micRaf = requestAnimationFrame(drawMic);
+}
+
+/* ══════════════════════════════════════════
+   TOUCH PRESSURE
+══════════════════════════════════════════ */
+let touchMaxFingers = 0;
+
+function initTouchPad() {
+  const pad = document.getElementById('touch-pad');
+  ['touchstart','touchmove','touchend','touchcancel'].forEach(evt =>
+    pad.addEventListener(evt, handleTouch, { passive: true })
+  );
+}
+
+function handleTouch(e) {
+  const pad   = document.getElementById('touch-pad');
+  const touches = e.touches;
+  const count = touches.length;
+  if (count > touchMaxFingers) {
+    touchMaxFingers = count;
+    document.getElementById('touch-max').textContent = touchMaxFingers;
+  }
+  document.getElementById('touch-count').textContent = count;
+  // Remove previous dots
+  pad.querySelectorAll('.touch-dot').forEach(d => d.remove());
+  let totalForce = 0, hasForce = false, totalArea = 0, hasArea = false;
+  const rect = pad.getBoundingClientRect();
+  for (let i = 0; i < touches.length; i++) {
+    const t = touches[i];
+    const x = ((t.clientX - rect.left) / rect.width)  * 100;
+    const y = ((t.clientY - rect.top)  / rect.height) * 100;
+    if (t.force > 0) { totalForce += t.force; hasForce = true; }
+    const rx = t.radiusX || 0, ry = t.radiusY || 0;
+    if (rx > 0 && ry > 0) { totalArea += Math.round(Math.PI * rx * ry); hasArea = true; }
+    const dot = document.createElement('div');
+    dot.className = 'touch-dot';
+    const size = Math.max(28, (rx || 14) * 2);
+    const opacity = hasForce ? (0.4 + t.force * 0.6) : 0.75;
+    dot.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:${opacity}`;
+    pad.appendChild(dot);
+  }
+  if (count > 0) {
+    document.getElementById('touch-force').textContent = hasForce ? (totalForce / count).toFixed(2) : 'N/A';
+    document.getElementById('touch-area').textContent  = hasArea  ? totalArea : 'N/A';
+  } else {
+    document.getElementById('touch-force').textContent = '—';
+    document.getElementById('touch-area').textContent  = '—';
   }
 }
 </script>
