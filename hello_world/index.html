@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hello World</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 1rem;
+    }
+
+    .card {
+      text-align: center;
+      padding: 2rem 2rem 2.5rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1.5rem;
+      backdrop-filter: blur(10px);
+      width: min(360px, 95vw);
+    }
+
+    h1 {
+      font-size: clamp(2rem, 10vw, 3.5rem);
+      font-weight: 800;
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.4rem;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.9rem;
+      margin-bottom: 1.8rem;
+    }
+
+    /* ── Calculator ── */
+    .calc {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .display {
+      padding: 1rem 1.2rem 0.6rem;
+      text-align: right;
+    }
+
+    .display .expr {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.35);
+      min-height: 1.2em;
+      letter-spacing: 0.03em;
+      word-break: break-all;
+    }
+
+    .display .result {
+      font-size: clamp(1.8rem, 8vw, 2.4rem);
+      font-weight: 300;
+      color: #fff;
+      letter-spacing: -0.02em;
+      word-break: break-all;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .btn {
+      padding: 1.1rem 0;
+      font-size: clamp(1rem, 4vw, 1.15rem);
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      background: rgba(30, 35, 60, 0.85);
+      color: #fff;
+      transition: background 0.1s, transform 0.07s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .btn:active {
+      background: rgba(255,255,255,0.18);
+      transform: scale(0.93);
+    }
+
+    .btn.op   { color: #f5a623; }
+    .btn.eq   { background: linear-gradient(135deg, #e94560, #c0392b); color: #fff; }
+    .btn.eq:active { opacity: 0.8; }
+    .btn.util { color: rgba(255,255,255,0.55); }
+    .btn.span2 { grid-column: span 2; }
+
+    .pulse {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #4caf50;
+      border-radius: 50%;
+      margin-right: 0.4rem;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.6); }
+      70%  { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+    }
+
+    .status {
+      margin-top: 1.5rem;
+      font-size: 0.78rem;
+      color: rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Hello, World!</h1>
+    <p class="subtitle">Interactive Calculator</p>
+
+    <div class="calc">
+      <div class="display">
+        <div class="expr" id="expr"></div>
+        <div class="result" id="result">0</div>
+      </div>
+      <div class="buttons">
+        <button class="btn util" data-action="clear">AC</button>
+        <button class="btn util" data-action="sign">+/−</button>
+        <button class="btn util" data-action="percent">%</button>
+        <button class="btn op"   data-action="op" data-val="/">÷</button>
+
+        <button class="btn" data-action="digit" data-val="7">7</button>
+        <button class="btn" data-action="digit" data-val="8">8</button>
+        <button class="btn" data-action="digit" data-val="9">9</button>
+        <button class="btn op" data-action="op" data-val="*">×</button>
+
+        <button class="btn" data-action="digit" data-val="4">4</button>
+        <button class="btn" data-action="digit" data-val="5">5</button>
+        <button class="btn" data-action="digit" data-val="6">6</button>
+        <button class="btn op" data-action="op" data-val="-">−</button>
+
+        <button class="btn" data-action="digit" data-val="1">1</button>
+        <button class="btn" data-action="digit" data-val="2">2</button>
+        <button class="btn" data-action="digit" data-val="3">3</button>
+        <button class="btn op" data-action="op" data-val="+">+</button>
+
+        <button class="btn span2" data-action="digit" data-val="0">0</button>
+        <button class="btn" data-action="dot">.</button>
+        <button class="btn eq" data-action="equals">=</button>
+      </div>
+    </div>
+
+    <div class="status">
+      <span class="pulse"></span> Served from 21.0.0.40
+    </div>
+  </div>
+
+  <script>
+    const display = document.getElementById('result');
+    const exprEl  = document.getElementById('expr');
+
+    let current  = '0';
+    let prev     = null;
+    let operator = null;
+    let resetNext = false;
+
+    function update() {
+      display.textContent = current.length > 12
+        ? parseFloat(current).toExponential(4)
+        : current;
+    }
+
+    document.querySelector('.buttons').addEventListener('click', e => {
+      const btn = e.target.closest('.btn');
+      if (!btn) return;
+      const { action, val } = btn.dataset;
+
+      if (action === 'digit') {
+        if (resetNext) { current = val; resetNext = false; }
+        else current = current === '0' ? val : current + val;
+        if (current.length > 15) current = current.slice(0, 15);
+      }
+
+      else if (action === 'dot') {
+        if (resetNext) { current = '0.'; resetNext = false; return update(); }
+        if (!current.includes('.')) current += '.';
+      }
+
+      else if (action === 'op') {
+        if (operator && !resetNext) compute();
+        prev = current;
+        operator = val;
+        resetNext = true;
+        const sym = { '/':'÷', '*':'×', '-':'−', '+':'+' }[val];
+        exprEl.textContent = `${prev} ${sym}`;
+        update(); return;
+      }
+
+      else if (action === 'equals') {
+        if (!operator) return;
+        exprEl.textContent = `${prev} ${{ '/':'÷', '*':'×', '-':'−', '+':'+' }[operator]} ${current} =`;
+        compute();
+        operator = null;
+        update(); return;
+      }
+
+      else if (action === 'clear') {
+        current = '0'; prev = null; operator = null; resetNext = false;
+        exprEl.textContent = '';
+      }
+
+      else if (action === 'sign') {
+        current = String(parseFloat(current) * -1);
+      }
+
+      else if (action === 'percent') {
+        current = String(parseFloat(current) / 100);
+      }
+
+      update();
+    });
+
+    function compute() {
+      const a = parseFloat(prev), b = parseFloat(current);
+      let r;
+      if (operator === '+') r = a + b;
+      else if (operator === '-') r = a - b;
+      else if (operator === '*') r = a * b;
+      else if (operator === '/') r = b === 0 ? 'Error' : a / b;
+      current = r === 'Error' ? 'Error' : String(+r.toFixed(10));
+      resetNext = true;
+    }
+
+    // Keyboard support
+    document.addEventListener('keydown', e => {
+      const map = {
+        '0':'0','1':'1','2':'2','3':'3','4':'4',
+        '5':'5','6':'6','7':'7','8':'8','9':'9',
+        '.':'.', ',':'.',
+        '+':'+', '-':'-', '*':'*', '/':'/',
+        'Enter':'=', '=':'=',
+        'Backspace':'back', 'Escape':'clear', '%':'%'
+      };
+      const a = map[e.key];
+      if (!a) return;
+      e.preventDefault();
+      if (a === 'back') {
+        current = current.length > 1 ? current.slice(0,-1) : '0';
+        update(); return;
+      }
+      const btn = [...document.querySelectorAll('.btn')].find(b => {
+        if (a === 'clear') return b.dataset.action === 'clear';
+        if (a === '=')     return b.dataset.action === 'equals';
+        if (a === '%')     return b.dataset.action === 'percent';
+        if ('+-*/'.includes(a)) return b.dataset.action === 'op' && b.dataset.val === a;
+        if (a === '.')     return b.dataset.action === 'dot';
+        return b.dataset.action === 'digit' && b.dataset.val === a;
+      });
+      btn && btn.click();
+    });
+  </script>
+</body>
+</html>
