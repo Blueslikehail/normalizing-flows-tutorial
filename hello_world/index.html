@@ -110,7 +110,9 @@
     .ic-tip    { background: linear-gradient(135deg, #0a84ff, #0055d4); }
     .ic-bmi    { background: linear-gradient(135deg, #30d158, #00864d); }
     .ic-unit   { background: linear-gradient(135deg, #bf5af2, #8944ab); }
-    .ic-sensor { background: linear-gradient(135deg, #00b4d8, #7b2ff7); }
+    .ic-sensor  { background: linear-gradient(135deg, #00b4d8, #7b2ff7); }
+    .ic-python  { background: linear-gradient(135deg, #306998, #ffd43b); }
+    .ic-neuro   { background: linear-gradient(135deg, #7b2ff7, #e94560); }
 
     /* ───── DOCK ───── */
     #dock {
@@ -520,6 +522,78 @@
       pointer-events: none;
     }
     #acc-alert-toast.acc-toast-show { top: 3.5rem; }
+
+    /* ════════════════════════════
+       PYTHON REPL
+    ════════════════════════════ */
+    .py-status { font-size: 0.75rem; text-align: center; color: var(--muted); margin-bottom: 0.5rem; min-height: 1.1em; }
+    .py-status.connected { color: #30d158; }
+    .py-status.error     { color: #ff453a; }
+    .py-output {
+      flex: 1; min-height: 150px; max-height: 260px; overflow-y: auto;
+      background: rgba(0,0,0,0.45); border: 1px solid var(--border);
+      border-radius: 0.8rem; padding: 0.75rem;
+      font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5;
+      margin-bottom: 0.7rem; white-space: pre-wrap; word-break: break-all;
+    }
+    .py-out-line.prompt { color: #48dbfb; }
+    .py-out-line.result { color: #ffd43b; }
+    .py-out-line.error  { color: #ff453a; }
+    .py-out-line.hint   { color: var(--muted); font-style: italic; }
+    .py-input-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .py-input {
+      flex: 1; background: var(--glass); border: 1px solid var(--border);
+      border-radius: 0.7rem; color: #fff; font-size: 0.88rem;
+      padding: 0.65rem 0.8rem; font-family: 'Courier New', monospace;
+      outline: none; resize: none;
+    }
+    .py-run-btn {
+      padding: 0.65rem 1rem; background: #30d158; border: none;
+      border-radius: 0.7rem; color: #000; font-weight: 700; font-size: 1rem;
+      cursor: pointer; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent; transition: opacity 0.15s;
+    }
+    .py-run-btn:disabled { opacity: 0.4; }
+    .py-action-row { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+    .py-action-btn {
+      flex: 1; padding: 0.55rem; border-radius: 0.6rem;
+      border: 1px solid var(--border); background: var(--glass);
+      color: var(--muted); font-size: 0.78rem; cursor: pointer; text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .py-snippets { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .py-snippet {
+      padding: 0.3rem 0.65rem; border-radius: 2rem;
+      border: 1px solid var(--border); background: var(--glass);
+      color: var(--muted); font-size: 0.72rem; cursor: pointer;
+      font-family: 'Courier New', monospace;
+      -webkit-tap-highlight-color: transparent; transition: all 0.12s;
+    }
+    .py-snippet:active { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* ════════════════════════════
+       NEURAL TRAINER
+    ════════════════════════════ */
+    .nn-status { font-size: 0.75rem; text-align: center; color: var(--muted); margin-bottom: 0.6rem; min-height: 1.1em; }
+    .nn-canvas {
+      width: 100%; aspect-ratio: 1;
+      border-radius: 0.8rem; background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border); display: block;
+      cursor: crosshair; margin-bottom: 0.7rem;
+      touch-action: manipulation;
+    }
+    .nn-controls { display: flex; gap: 0.45rem; margin-bottom: 0.65rem; }
+    .nn-ctrl-btn {
+      flex: 1; padding: 0.6rem 0.2rem;
+      border-radius: 0.65rem; border: 1px solid;
+      font-size: 0.75rem; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; transition: opacity 0.12s;
+      text-align: center;
+    }
+    .nn-ctrl-btn:active  { opacity: 0.7; }
+    .nn-ctrl-btn:disabled { opacity: 0.4; }
+    .nn-info { text-align: center; }
+    .nn-legend { font-size: 0.8rem; }
   </style>
 </head>
 <body>
@@ -577,6 +651,14 @@
       <div class="app-icon" onclick="openApp('sensors')">
         <div class="app-icon-img ic-sensor">📡</div>
         <div class="app-icon-label">Sensors</div>
+      </div>
+      <div class="app-icon" onclick="openApp('python')">
+        <div class="app-icon-img ic-python">🐍</div>
+        <div class="app-icon-label">Python</div>
+      </div>
+      <div class="app-icon" onclick="openApp('neuro')">
+        <div class="app-icon-img ic-neuro">🧠</div>
+        <div class="app-icon-label">Neural Net</div>
       </div>
     </div>
   </div>
@@ -965,6 +1047,64 @@
     </div>
   </div>
 
+  <!-- ══════════ APP: PYTHON REPL ══════════ -->
+  <div class="app-view" id="app-python">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Python REPL</span>
+    </div>
+    <div class="app-body">
+      <div class="py-status" id="py-status">Connecting to Jupyter on :8889…</div>
+      <div class="py-snippets">
+        <div class="py-snippet" onclick="pySnippet('print(\"Hello from Python!\")')">hello</div>
+        <div class="py-snippet" onclick="pySnippet('import math\nmath.sqrt(2)')">math</div>
+        <div class="py-snippet" onclick="pySnippet('import numpy as np\nnp.random.randn(4).tolist()')">numpy</div>
+        <div class="py-snippet" onclick="pySnippet('import sys\nsys.version')">version</div>
+      </div>
+      <div class="py-output" id="py-output"></div>
+      <div class="py-input-row">
+        <textarea class="py-input" id="py-input" placeholder="Enter Python code…" rows="3"></textarea>
+        <button class="py-run-btn" id="py-run-btn" onclick="pyRun()" disabled>▶</button>
+      </div>
+      <div class="py-action-row">
+        <div class="py-action-btn" onclick="pyClear()">Clear output</div>
+        <div class="py-action-btn" onclick="initPython()">Reconnect</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ APP: NEURAL TRAINER ══════════ -->
+  <div class="app-view" id="app-neuro">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Neural Trainer</span>
+    </div>
+    <div class="app-body">
+      <div class="nn-status" id="nn-status">Tap the canvas to add blue training points</div>
+      <canvas id="nn-canvas" class="nn-canvas"></canvas>
+      <div class="nn-controls">
+        <button id="nn-mode-btn" class="nn-ctrl-btn"
+          style="background:rgba(10,132,255,0.18);border-color:#0a84ff;color:#0a84ff"
+          onclick="nnToggleMode()">● Blue mode</button>
+        <button id="nn-train-btn" class="nn-ctrl-btn"
+          style="background:rgba(48,209,88,0.18);border-color:#30d158;color:#30d158"
+          onclick="nnTrain()">⚡ Train</button>
+        <button class="nn-ctrl-btn"
+          style="background:var(--glass);border-color:var(--border);color:var(--muted)"
+          onclick="nnClear()">✕ Clear</button>
+      </div>
+      <div class="nn-info">
+        <div class="nn-legend">
+          <span style="color:#0a84ff">●</span> Class A &nbsp;
+          <span style="color:#e94560">●</span> Class B
+        </div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem">
+          Place points → tap Train → see the decision boundary appear
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /shell -->
 
 <script>
@@ -975,10 +1115,12 @@ let currentApp = null;
 function openApp(id) {
   currentApp = id;
   document.getElementById('app-' + id).classList.add('open');
-  if (id === 'clock') startClock();
-  if (id === 'color') updateColor();
-  if (id === 'unit') initUnits();
+  if (id === 'clock')   startClock();
+  if (id === 'color')   updateColor();
+  if (id === 'unit')    initUnits();
   if (id === 'sensors') initSensors();
+  if (id === 'python')  initPython();
+  if (id === 'neuro')   setTimeout(nnInitCanvas, 60);
 }
 function closeApp() {
   if (!currentApp) return;
@@ -1708,6 +1850,253 @@ function handleTouch(e) {
     forceValid ? Math.round(totalForce / count * 100) + '%' : 'N/A';
   document.getElementById('touch-area').textContent  =
     (areaSupported && areaCount > 0) ? Math.round(totalArea / areaCount) + ' px²' : 'N/A';
+}
+
+/* ══════════════════════════════════════════
+   PYTHON REPL  — Jupyter kernel via WebSocket
+══════════════════════════════════════════ */
+let pyKernelId = null, pyWs = null, pyBusy = false;
+
+async function initPython() {
+  if (pyWs && pyWs.readyState === WebSocket.OPEN) return;
+  const status = document.getElementById('py-status');
+  const btn    = document.getElementById('py-run-btn');
+  status.textContent = 'Connecting to Jupyter on :8889…';
+  status.className   = 'py-status';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('http://localhost:8889/api/kernels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'python3' })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const kernel = await res.json();
+    pyKernelId = kernel.id;
+
+    pyWs = new WebSocket(`ws://localhost:8889/api/kernels/${pyKernelId}/channels`);
+
+    pyWs.onopen = () => {
+      status.textContent = '● Connected to Python 3 kernel';
+      status.className   = 'py-status connected';
+      btn.disabled = false;
+      pyAppendLine('Ready — try a snippet above or write your own code', 'hint');
+    };
+
+    pyWs.onmessage = e => {
+      const msg = JSON.parse(e.data);
+      const { msg_type, content } = msg;
+      if (msg_type === 'stream') {
+        content.text.split('\n').forEach(l => l && pyAppendLine(l,
+          content.name === 'stderr' ? 'error' : 'output'));
+      } else if (msg_type === 'execute_result') {
+        pyAppendLine((content.data['text/plain'] || '').trim(), 'result');
+      } else if (msg_type === 'error') {
+        (content.traceback || []).forEach(l =>
+          pyAppendLine(l.replace(/\x1b\[[0-9;]*m/g, ''), 'error'));
+      } else if (msg_type === 'execute_reply' || (msg_type === 'status' && content.execution_state === 'idle')) {
+        if (pyBusy) { pyBusy = false; btn.disabled = false; }
+      }
+    };
+
+    pyWs.onerror = () => {
+      status.textContent = '✗ WebSocket error';
+      status.className   = 'py-status error';
+    };
+    pyWs.onclose = () => {
+      if (status.className.includes('connected')) {
+        status.textContent = 'Disconnected — tap Reconnect';
+        status.className   = 'py-status error';
+        btn.disabled = true;
+      }
+    };
+
+  } catch (e) {
+    status.textContent = '✗ Jupyter not reachable — run: bash launch_jupyter.sh';
+    status.className   = 'py-status error';
+    pyAppendLine('Then open: http://localhost:8889', 'hint');
+  }
+}
+
+function pyRun() {
+  const code = document.getElementById('py-input').value.trim();
+  if (!code || !pyWs || pyWs.readyState !== WebSocket.OPEN || pyBusy) return;
+  pyBusy = true;
+  document.getElementById('py-run-btn').disabled = true;
+  pyAppendLine('>>> ' + code.replace(/\n/g, '\n    '), 'prompt');
+  pyWs.send(JSON.stringify({
+    header: { msg_id: 'id-' + Date.now(), username: 'user',
+              session: 'sess-' + Date.now(), msg_type: 'execute_request',
+              version: '5.0', date: new Date().toISOString() },
+    parent_header: {}, metadata: {},
+    content: { code, silent: false, store_history: true,
+               user_expressions: {}, allow_stdin: false },
+    channel: 'shell', buffers: []
+  }));
+}
+
+function pySnippet(code) {
+  document.getElementById('py-input').value = code;
+}
+
+function pyAppendLine(text, cls) {
+  const out = document.getElementById('py-output');
+  const d = document.createElement('div');
+  d.className = 'py-out-line ' + (cls || 'output');
+  d.textContent = text;
+  out.appendChild(d);
+  out.scrollTop = out.scrollHeight;
+}
+
+function pyClear() {
+  document.getElementById('py-output').innerHTML = '';
+}
+
+/* ══════════════════════════════════════════
+   NEURAL TRAINER  — brain.js, runs 100% in browser
+══════════════════════════════════════════ */
+let nnNet = null, nnPoints = [], nnMode = 'a';
+
+async function nnLoadBrain() {
+  if (window.brain) return;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/brain.js/dist/brain-browser.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function nnInitCanvas() {
+  const canvas = document.getElementById('nn-canvas');
+  if (!canvas || canvas._init) return;
+  canvas._init = true;
+  canvas.width  = canvas.offsetWidth  || 280;
+  canvas.height = canvas.offsetWidth  || 280;
+
+  canvas.addEventListener('click', nnAddPoint);
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    nnAddPoint({ clientX: t.clientX, clientY: t.clientY });
+  }, { passive: false });
+
+  nnDraw();
+  nnUpdateStatus();
+}
+
+function nnAddPoint(e) {
+  const canvas = document.getElementById('nn-canvas');
+  const rect   = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top)  / rect.height;
+  nnPoints.push({ x, y, cls: nnMode });
+  nnDraw();
+  nnUpdateStatus();
+}
+
+function nnDraw() {
+  const canvas = document.getElementById('nn-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Decision boundary (sampled grid)
+  if (nnNet) {
+    const step = 6;
+    for (let px = 0; px < W; px += step) {
+      for (let py = 0; py < H; py += step) {
+        const v = nnNet.run({ x: px / W, y: py / H }).a;
+        ctx.fillStyle = `rgba(${Math.round(233*v)},${Math.round(100*(1-v))},${Math.round(255*(1-v))},0.22)`;
+        ctx.fillRect(px, py, step, step);
+      }
+    }
+  }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    ctx.beginPath(); ctx.moveTo(i*W/4, 0);  ctx.lineTo(i*W/4, H);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i*H/4);  ctx.lineTo(W, i*H/4);  ctx.stroke();
+  }
+
+  // Points
+  nnPoints.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x * W, p.y * H, 6, 0, Math.PI * 2);
+    ctx.fillStyle   = p.cls === 'a' ? '#0a84ff' : '#e94560';
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth   = 1.5;
+    ctx.fill(); ctx.stroke();
+  });
+}
+
+async function nnTrain() {
+  const aPoints = nnPoints.filter(p => p.cls === 'a');
+  const bPoints = nnPoints.filter(p => p.cls === 'b');
+  if (aPoints.length < 2 || bPoints.length < 2) {
+    document.getElementById('nn-status').textContent =
+      'Need ≥ 2 blue AND ≥ 2 red points first';
+    return;
+  }
+
+  const btn = document.getElementById('nn-train-btn');
+  btn.disabled = true;
+  document.getElementById('nn-status').textContent = 'Loading brain.js (~90 KB)…';
+
+  try {
+    await nnLoadBrain();
+    document.getElementById('nn-status').textContent = 'Training neural network…';
+
+    const data = nnPoints.map(p => ({
+      input:  { x: p.x, y: p.y },
+      output: { a: p.cls === 'b' ? 1 : 0 }
+    }));
+
+    nnNet = new brain.NeuralNetwork({ hiddenLayers: [8, 8], activation: 'sigmoid' });
+
+    // Run synchronous training in next tick so the status message renders first
+    setTimeout(() => {
+      const res = nnNet.train(data, { iterations: 2000, errorThresh: 0.003, learningRate: 0.1 });
+      document.getElementById('nn-status').textContent =
+        `Trained! Error: ${res.error.toFixed(4)} · ${res.iterations} iters · decision boundary shown`;
+      nnDraw();
+      btn.disabled = false;
+    }, 30);
+
+  } catch (err) {
+    document.getElementById('nn-status').textContent = '✗ ' + err.message;
+    btn.disabled = false;
+  }
+}
+
+function nnToggleMode() {
+  nnMode = nnMode === 'a' ? 'b' : 'a';
+  const btn = document.getElementById('nn-mode-btn');
+  if (nnMode === 'a') {
+    btn.style.cssText = 'background:rgba(10,132,255,0.18);border-color:#0a84ff;color:#0a84ff';
+    btn.textContent = '● Blue mode';
+  } else {
+    btn.style.cssText = 'background:rgba(233,69,96,0.18);border-color:#e94560;color:#e94560';
+    btn.textContent = '● Red mode';
+  }
+}
+
+function nnClear() {
+  nnPoints = []; nnNet = null;
+  const canvas = document.getElementById('nn-canvas');
+  if (canvas) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); nnDraw(); }
+  document.getElementById('nn-status').textContent = 'Tap the canvas to add blue training points';
+}
+
+function nnUpdateStatus() {
+  const a = nnPoints.filter(p => p.cls === 'a').length;
+  const b = nnPoints.filter(p => p.cls === 'b').length;
+  const ready = a >= 2 && b >= 2;
+  document.getElementById('nn-status').textContent =
+    `${a} blue · ${b} red — ${ready ? 'ready to train!' : 'add more points'}`;
 }
 </script>
 <div id="acc-alert-toast"></div>
