@@ -2,283 +2,1063 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>MiniOS</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f1a;
+      --glass: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.10);
+      --text: #fff;
+      --muted: rgba(255,255,255,0.45);
+      --accent: #e94560;
+      --gold: #f5a623;
     }
 
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    html, body {
+      height: 100%; width: 100%;
+      overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 1rem;
+      background: var(--bg);
+      color: var(--text);
     }
 
-    .card {
+    /* ───── PHONE SHELL ───── */
+    #shell {
+      width: 100%; height: 100%;
+      position: relative;
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%);
+      display: flex; flex-direction: column;
+    }
+
+    /* ───── STATUS BAR ───── */
+    #statusbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.55rem 1.2rem 0.3rem;
+      font-size: 0.75rem; font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    #statusbar .right { display: flex; gap: 0.4rem; align-items: center; }
+    .battery { font-size: 0.7rem; opacity: 0.8; }
+
+    /* ───── HOME SCREEN ───── */
+    #home {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 1rem 1.2rem 0.8rem;
+      overflow: hidden;
+    }
+    #home-date {
       text-align: center;
-      padding: 2rem 2rem 2.5rem;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 1.5rem;
-      backdrop-filter: blur(10px);
-      width: min(360px, 95vw);
+      margin-bottom: 0.8rem;
+    }
+    #home-clock {
+      font-size: clamp(3rem, 16vw, 5rem);
+      font-weight: 200;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    #home-day {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
     }
 
-    h1 {
-      font-size: clamp(2rem, 10vw, 3.5rem);
-      font-weight: 800;
-      background: linear-gradient(90deg, #e94560, #f5a623);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.4rem;
-      line-height: 1.1;
+    /* App grid */
+    #app-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.2rem 0.8rem;
+      margin-top: 1.4rem;
+    }
+    .app-icon {
+      display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .app-icon-img {
+      width: clamp(54px, 16vw, 68px);
+      height: clamp(54px, 16vw, 68px);
+      border-radius: 22%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(1.6rem, 6vw, 2rem);
+      transition: transform 0.12s, opacity 0.12s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .app-icon:active .app-icon-img {
+      transform: scale(0.88);
+      opacity: 0.75;
+    }
+    .app-icon-label {
+      font-size: 0.65rem;
+      color: var(--text);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+      text-align: center;
+      line-height: 1.2;
     }
 
-    .subtitle {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 0.9rem;
-      margin-bottom: 1.8rem;
+    /* Icon colours */
+    .ic-calc   { background: linear-gradient(135deg, #434343, #000); }
+    .ic-clock  { background: linear-gradient(135deg, #1c1c1e, #3a3a3c); }
+    .ic-notes  { background: linear-gradient(135deg, #ffd60a, #ff9f0a); }
+    .ic-color  { background: linear-gradient(135deg, #30d158, #32ade6, #ff375f, #ffd60a); }
+    .ic-dice   { background: linear-gradient(135deg, #636e72, #2d3436); }
+    .ic-tip    { background: linear-gradient(135deg, #0a84ff, #0055d4); }
+    .ic-bmi    { background: linear-gradient(135deg, #30d158, #00864d); }
+    .ic-unit   { background: linear-gradient(135deg, #bf5af2, #8944ab); }
+
+    /* ───── DOCK ───── */
+    #dock {
+      margin: 0.5rem 1.2rem 1rem;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 1.4rem;
+      padding: 0.65rem 1rem;
+      display: flex; justify-content: space-around;
+      backdrop-filter: blur(20px);
+      flex-shrink: 0;
     }
 
-    /* ── Calculator ── */
+    /* ───── APP VIEWS ───── */
+    .app-view {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%);
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+      z-index: 10;
+    }
+    .app-view.open { transform: translateY(0); }
+
+    .app-topbar {
+      display: flex; align-items: center;
+      padding: 0.9rem 1rem 0.5rem;
+      flex-shrink: 0;
+    }
+    .back-btn {
+      background: none; border: none; color: #0a84ff;
+      font-size: 0.95rem; cursor: pointer;
+      display: flex; align-items: center; gap: 0.25rem;
+      padding: 0.3rem 0.3rem 0.3rem 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .back-btn::before { content: "‹"; font-size: 1.4rem; line-height: 1; }
+    .app-title {
+      flex: 1; text-align: center;
+      font-size: 1rem; font-weight: 600;
+      margin-right: 2.5rem; /* balance back btn */
+    }
+    .app-body {
+      flex: 1; overflow-y: auto;
+      padding: 0.5rem 1rem 1.5rem;
+      display: flex; flex-direction: column;
+    }
+
+    /* ════════════════════════════
+       CALCULATOR
+    ════════════════════════════ */
     .calc {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0,0,0,0.3);
       border-radius: 1rem;
       overflow: hidden;
       border: 1px solid rgba(255,255,255,0.08);
+      flex: 1; display: flex; flex-direction: column;
     }
-
-    .display {
+    .calc-display {
       padding: 1rem 1.2rem 0.6rem;
       text-align: right;
     }
-
-    .display .expr {
-      font-size: 0.8rem;
-      color: rgba(255,255,255,0.35);
-      min-height: 1.2em;
-      letter-spacing: 0.03em;
-      word-break: break-all;
+    .calc-expr { font-size: 0.8rem; color: var(--muted); min-height: 1.2em; word-break: break-all; }
+    .calc-result {
+      font-size: clamp(2rem, 10vw, 2.8rem);
+      font-weight: 300; color: #fff;
+      letter-spacing: -0.02em; word-break: break-all;
     }
-
-    .display .result {
-      font-size: clamp(1.8rem, 8vw, 2.4rem);
-      font-weight: 300;
-      color: #fff;
-      letter-spacing: -0.02em;
-      word-break: break-all;
+    .calc-buttons {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 1px; background: rgba(255,255,255,0.06);
+      flex: 1;
     }
-
-    .buttons {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1px;
-      background: rgba(255,255,255,0.06);
-    }
-
-    .btn {
-      padding: 1.1rem 0;
-      font-size: clamp(1rem, 4vw, 1.15rem);
-      font-weight: 500;
-      border: none;
-      cursor: pointer;
-      background: rgba(30, 35, 60, 0.85);
-      color: #fff;
+    .cbtn {
+      padding: 0; aspect-ratio: unset;
+      min-height: clamp(52px, 13vw, 68px);
+      font-size: clamp(1rem, 4vw, 1.2rem); font-weight: 500;
+      border: none; cursor: pointer;
+      background: rgba(30,35,60,0.85); color: #fff;
       transition: background 0.1s, transform 0.07s;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
+    .cbtn:active { background: rgba(255,255,255,0.18); transform: scale(0.9); }
+    .cbtn.op   { color: var(--gold); }
+    .cbtn.eq   { background: linear-gradient(135deg, #e94560, #c0392b); }
+    .cbtn.eq:active { opacity: 0.8; transform: scale(0.9); }
+    .cbtn.util { color: var(--muted); }
+    .cbtn.span2 { grid-column: span 2; }
 
-    .btn:active {
-      background: rgba(255,255,255,0.18);
-      transform: scale(0.93);
+    /* ════════════════════════════
+       CLOCK
+    ════════════════════════════ */
+    .clock-app {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 1.5rem; padding-top: 1rem;
+    }
+    .clock-face {
+      font-size: clamp(3.5rem, 18vw, 6rem);
+      font-weight: 100; letter-spacing: -0.02em;
+    }
+    .clock-date-str {
+      color: var(--muted); font-size: 0.9rem;
+    }
+    .clock-seg {
+      display: flex; gap: 1rem; width: 100%;
+    }
+    .clock-card {
+      flex: 1; background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 1rem; padding: 1rem;
+      text-align: center;
+    }
+    .clock-card .val { font-size: 1.8rem; font-weight: 200; }
+    .clock-card .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    /* Stopwatch */
+    .sw-display { font-size: clamp(2.5rem,14vw,4.5rem); font-weight: 100; letter-spacing: 0.04em; text-align: center; margin-top: 0.5rem; }
+    .sw-btns { display: flex; gap: 1rem; justify-content: center; margin-top: 1.2rem; }
+    .sw-btn {
+      width: 72px; height: 72px; border-radius: 50%;
+      border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s;
+    }
+    .sw-btn:active { transform: scale(0.9); }
+    .sw-btn.start { background: #30d158; color: #000; }
+    .sw-btn.stop  { background: #ff453a; color: #fff; }
+    .sw-btn.reset { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* ════════════════════════════
+       NOTES
+    ════════════════════════════ */
+    .notes-area {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 0.8rem;
+      padding: 0.8rem;
+      color: #fff;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+    }
+    .notes-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; }
+    .notes-count { font-size: 0.75rem; color: var(--muted); }
+    .notes-clear {
+      background: none; border: none; color: #ff453a;
+      font-size: 0.8rem; cursor: pointer; padding: 0.2rem 0;
     }
 
-    .btn.op   { color: #f5a623; }
-    .btn.eq   { background: linear-gradient(135deg, #e94560, #c0392b); color: #fff; }
-    .btn.eq:active { opacity: 0.8; }
-    .btn.util { color: rgba(255,255,255,0.55); }
-    .btn.span2 { grid-column: span 2; }
+    /* ════════════════════════════
+       COLOR PICKER
+    ════════════════════════════ */
+    .color-preview {
+      height: 120px; border-radius: 1rem;
+      margin-bottom: 1.2rem;
+      border: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .color-hex {
+      text-align: center; font-size: 1.4rem;
+      font-weight: 300; letter-spacing: 0.08em;
+      margin-bottom: 1.2rem; cursor: pointer;
+    }
+    .color-hex span { font-size: 0.75rem; color: var(--muted); display: block; margin-top: 0.2rem; }
+    .slider-group { margin-bottom: 1rem; }
+    .slider-group label { font-size: 0.8rem; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 0.35rem; }
+    input[type=range] {
+      width: 100%; accent-color: var(--accent);
+      height: 4px; cursor: pointer;
+    }
+    .color-swatches {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem;
+    }
+    .swatch {
+      width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; border: 2px solid transparent;
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .swatch:active { transform: scale(0.88); }
 
-    .pulse {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      background: #4caf50;
-      border-radius: 50%;
-      margin-right: 0.4rem;
-      animation: pulse 1.5s infinite;
+    /* ════════════════════════════
+       DICE ROLLER
+    ════════════════════════════ */
+    .dice-center { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
+    .dice-face {
+      width: min(160px, 45vw); height: min(160px, 45vw);
+      background: #fff; border-radius: 20%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(4rem, 18vw, 6rem);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      transition: transform 0.15s;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dice-face.roll { animation: diceroll 0.4s ease; }
+    @keyframes diceroll {
+      0%   { transform: rotate(0deg) scale(1); }
+      25%  { transform: rotate(-15deg) scale(0.9); }
+      75%  { transform: rotate(10deg) scale(1.05); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    .dice-hint { color: var(--muted); font-size: 0.85rem; }
+    .dice-history { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+    .dice-hist-item {
+      width: 32px; height: 32px;
+      background: var(--glass); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; border: 1px solid var(--border);
+    }
+    .dice-selector { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+    .dice-type {
+      padding: 0.4rem 0.9rem;
+      border-radius: 2rem; border: 1px solid var(--border);
+      background: var(--glass); color: var(--muted);
+      font-size: 0.8rem; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.15s;
+    }
+    .dice-type.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ════════════════════════════
+       TIP CALCULATOR
+    ════════════════════════════ */
+    .tip-field { margin-bottom: 1rem; }
+    .tip-field label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 0.35rem; }
+    .tip-input {
+      width: 100%; padding: 0.75rem 1rem;
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 0.7rem; color: #fff; font-size: 1.1rem;
+      outline: none; font-family: inherit;
+    }
+    .tip-input:focus { border-color: rgba(255,255,255,0.3); }
+    .tip-pcts { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tip-pct {
+      flex: 1; padding: 0.6rem 0; text-align: center;
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 0.6rem; cursor: pointer; font-size: 0.85rem;
+      -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+    }
+    .tip-pct.active { background: #0a84ff; border-color: #0a84ff; color: #fff; }
+    .tip-result-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.7rem; margin-top: 0.5rem;
+    }
+    .tip-card {
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 0.8rem; padding: 0.9rem; text-align: center;
+    }
+    .tip-card .tc-val { font-size: 1.5rem; font-weight: 300; }
+    .tip-card .tc-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* ════════════════════════════
+       BMI
+    ════════════════════════════ */
+    .bmi-gauge {
+      position: relative; height: 12px;
+      background: linear-gradient(90deg, #0a84ff, #30d158, #ffd60a, #ff9f0a, #ff453a);
+      border-radius: 6px; margin: 1rem 0 0.4rem;
+      overflow: visible;
+    }
+    .bmi-needle {
+      position: absolute; top: -6px;
+      width: 4px; height: 24px;
+      background: #fff; border-radius: 2px;
+      transform: translateX(-50%);
+      transition: left 0.4s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .bmi-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--muted); margin-bottom: 1rem; }
+    .bmi-result { text-align: center; margin: 1rem 0; }
+    .bmi-result .bmi-val { font-size: 3rem; font-weight: 100; }
+    .bmi-result .bmi-cat { font-size: 0.9rem; color: var(--muted); margin-top: 0.2rem; }
+    .bmi-toggle { display: flex; background: var(--glass); border-radius: 0.6rem; overflow: hidden; border: 1px solid var(--border); margin-bottom: 1rem; }
+    .bmi-unit-btn { flex: 1; padding: 0.5rem; text-align: center; font-size: 0.8rem; cursor: pointer; transition: background 0.15s; }
+    .bmi-unit-btn.active { background: rgba(255,255,255,0.15); }
+
+    /* ════════════════════════════
+       UNIT CONVERTER
+    ════════════════════════════ */
+    .unit-cats { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .unit-cat {
+      padding: 0.35rem 0.8rem; border-radius: 2rem;
+      border: 1px solid var(--border); background: var(--glass);
+      color: var(--muted); font-size: 0.78rem; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+    }
+    .unit-cat.active { background: #bf5af2; border-color: #bf5af2; color: #fff; }
+    .unit-row { display: flex; gap: 0.6rem; align-items: flex-end; margin-bottom: 0.7rem; }
+    .unit-row .unit-input {
+      flex: 1; padding: 0.7rem; background: var(--glass);
+      border: 1px solid var(--border); border-radius: 0.6rem;
+      color: #fff; font-size: 1rem; outline: none; font-family: inherit;
+    }
+    .unit-row select {
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 0.6rem; color: #fff; padding: 0.7rem 0.5rem;
+      font-size: 0.85rem; outline: none; cursor: pointer;
+    }
+    .unit-swap {
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 50%; width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 1rem; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    @keyframes pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.6); }
-      70%  { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+    /* ───── SHARED UTIL ───── */
+    .pill-btn {
+      width: 100%; padding: 0.85rem;
+      background: var(--accent); border: none;
+      border-radius: 0.8rem; color: #fff;
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+      margin-top: 0.5rem;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
     }
-
-    .status {
-      margin-top: 1.5rem;
-      font-size: 0.78rem;
-      color: rgba(255, 255, 255, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .pill-btn:active { opacity: 0.75; }
+    .section-sep { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Hello, World!</h1>
-    <p class="subtitle">Interactive Calculator</p>
+<div id="shell">
 
-    <div class="calc">
-      <div class="display">
-        <div class="expr" id="expr"></div>
-        <div class="result" id="result">0</div>
-      </div>
-      <div class="buttons">
-        <button class="btn util" data-action="clear">AC</button>
-        <button class="btn util" data-action="sign">+/−</button>
-        <button class="btn util" data-action="percent">%</button>
-        <button class="btn op"   data-action="op" data-val="/">÷</button>
-
-        <button class="btn" data-action="digit" data-val="7">7</button>
-        <button class="btn" data-action="digit" data-val="8">8</button>
-        <button class="btn" data-action="digit" data-val="9">9</button>
-        <button class="btn op" data-action="op" data-val="*">×</button>
-
-        <button class="btn" data-action="digit" data-val="4">4</button>
-        <button class="btn" data-action="digit" data-val="5">5</button>
-        <button class="btn" data-action="digit" data-val="6">6</button>
-        <button class="btn op" data-action="op" data-val="-">−</button>
-
-        <button class="btn" data-action="digit" data-val="1">1</button>
-        <button class="btn" data-action="digit" data-val="2">2</button>
-        <button class="btn" data-action="digit" data-val="3">3</button>
-        <button class="btn op" data-action="op" data-val="+">+</button>
-
-        <button class="btn span2" data-action="digit" data-val="0">0</button>
-        <button class="btn" data-action="dot">.</button>
-        <button class="btn eq" data-action="equals">=</button>
-      </div>
-    </div>
-
-    <div class="status">
-      <span class="pulse"></span> Served from 21.0.0.40
+  <!-- STATUS BAR -->
+  <div id="statusbar">
+    <span id="sb-time">9:41</span>
+    <div class="right">
+      <span>WiFi</span>
+      <span class="battery">🔋</span>
     </div>
   </div>
 
-  <script>
-    const display = document.getElementById('result');
-    const exprEl  = document.getElementById('expr');
+  <!-- HOME SCREEN -->
+  <div id="home">
+    <div id="home-date">
+      <div id="home-clock">9:41</div>
+      <div id="home-day">Saturday, February 21</div>
+    </div>
 
-    let current  = '0';
-    let prev     = null;
-    let operator = null;
-    let resetNext = false;
+    <div id="app-grid">
+      <div class="app-icon" onclick="openApp('calculator')">
+        <div class="app-icon-img ic-calc">🧮</div>
+        <div class="app-icon-label">Calculator</div>
+      </div>
+      <div class="app-icon" onclick="openApp('clock')">
+        <div class="app-icon-img ic-clock">🕐</div>
+        <div class="app-icon-label">Clock</div>
+      </div>
+      <div class="app-icon" onclick="openApp('notes')">
+        <div class="app-icon-img ic-notes">📝</div>
+        <div class="app-icon-label">Notes</div>
+      </div>
+      <div class="app-icon" onclick="openApp('color')">
+        <div class="app-icon-img ic-color">🎨</div>
+        <div class="app-icon-label">Color</div>
+      </div>
+      <div class="app-icon" onclick="openApp('dice')">
+        <div class="app-icon-img ic-dice">🎲</div>
+        <div class="app-icon-label">Dice</div>
+      </div>
+      <div class="app-icon" onclick="openApp('tip')">
+        <div class="app-icon-img ic-tip">💰</div>
+        <div class="app-icon-label">Tip Calc</div>
+      </div>
+      <div class="app-icon" onclick="openApp('bmi')">
+        <div class="app-icon-img ic-bmi">⚖️</div>
+        <div class="app-icon-label">BMI</div>
+      </div>
+      <div class="app-icon" onclick="openApp('unit')">
+        <div class="app-icon-img ic-unit">📐</div>
+        <div class="app-icon-label">Units</div>
+      </div>
+    </div>
+  </div>
 
-    function update() {
-      display.textContent = current.length > 12
-        ? parseFloat(current).toExponential(4)
-        : current;
-    }
+  <!-- DOCK -->
+  <div id="dock">
+    <div class="app-icon" onclick="openApp('calculator')">
+      <div class="app-icon-img ic-calc" style="width:48px;height:48px;font-size:1.4rem">🧮</div>
+    </div>
+    <div class="app-icon" onclick="openApp('clock')">
+      <div class="app-icon-img ic-clock" style="width:48px;height:48px;font-size:1.4rem">🕐</div>
+    </div>
+    <div class="app-icon" onclick="openApp('notes')">
+      <div class="app-icon-img ic-notes" style="width:48px;height:48px;font-size:1.4rem">📝</div>
+    </div>
+  </div>
 
-    document.querySelector('.buttons').addEventListener('click', e => {
-      const btn = e.target.closest('.btn');
-      if (!btn) return;
-      const { action, val } = btn.dataset;
+  <!-- ══════════ APP: CALCULATOR ══════════ -->
+  <div class="app-view" id="app-calculator">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Calculator</span>
+    </div>
+    <div class="app-body">
+      <div class="calc">
+        <div class="calc-display">
+          <div class="calc-expr" id="calc-expr"></div>
+          <div class="calc-result" id="calc-result">0</div>
+        </div>
+        <div class="calc-buttons">
+          <button class="cbtn util" data-action="clear">AC</button>
+          <button class="cbtn util" data-action="sign">+/−</button>
+          <button class="cbtn util" data-action="percent">%</button>
+          <button class="cbtn op"   data-action="op" data-val="/">÷</button>
+          <button class="cbtn" data-action="digit" data-val="7">7</button>
+          <button class="cbtn" data-action="digit" data-val="8">8</button>
+          <button class="cbtn" data-action="digit" data-val="9">9</button>
+          <button class="cbtn op" data-action="op" data-val="*">×</button>
+          <button class="cbtn" data-action="digit" data-val="4">4</button>
+          <button class="cbtn" data-action="digit" data-val="5">5</button>
+          <button class="cbtn" data-action="digit" data-val="6">6</button>
+          <button class="cbtn op" data-action="op" data-val="-">−</button>
+          <button class="cbtn" data-action="digit" data-val="1">1</button>
+          <button class="cbtn" data-action="digit" data-val="2">2</button>
+          <button class="cbtn" data-action="digit" data-val="3">3</button>
+          <button class="cbtn op" data-action="op" data-val="+">+</button>
+          <button class="cbtn span2" data-action="digit" data-val="0">0</button>
+          <button class="cbtn" data-action="dot">.</button>
+          <button class="cbtn eq" data-action="equals">=</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      if (action === 'digit') {
-        if (resetNext) { current = val; resetNext = false; }
-        else current = current === '0' ? val : current + val;
-        if (current.length > 15) current = current.slice(0, 15);
-      }
+  <!-- ══════════ APP: CLOCK ══════════ -->
+  <div class="app-view" id="app-clock">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Clock</span>
+    </div>
+    <div class="app-body">
+      <div class="clock-app">
+        <div>
+          <div class="clock-face" id="clk-time">00:00:00</div>
+          <div class="clock-date-str" id="clk-date"></div>
+        </div>
+        <div class="clock-seg">
+          <div class="clock-card">
+            <div class="val" id="clk-h">0</div>
+            <div class="lbl">Hour</div>
+          </div>
+          <div class="clock-card">
+            <div class="val" id="clk-m">0</div>
+            <div class="lbl">Min</div>
+          </div>
+          <div class="clock-card">
+            <div class="val" id="clk-s">0</div>
+            <div class="lbl">Sec</div>
+          </div>
+        </div>
+        <hr class="section-sep" style="width:100%">
+        <div style="font-size:0.8rem;color:var(--muted);text-align:center">Stopwatch</div>
+        <div class="sw-display" id="sw-display">00:00.0</div>
+        <div class="sw-btns">
+          <button class="sw-btn reset" id="sw-reset" onclick="swReset()">Reset</button>
+          <button class="sw-btn start" id="sw-start" onclick="swToggle()">Start</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      else if (action === 'dot') {
-        if (resetNext) { current = '0.'; resetNext = false; return update(); }
-        if (!current.includes('.')) current += '.';
-      }
+  <!-- ══════════ APP: NOTES ══════════ -->
+  <div class="app-view" id="app-notes">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Notes</span>
+    </div>
+    <div class="app-body">
+      <textarea class="notes-area" id="notes-area" placeholder="Start typing…"></textarea>
+      <div class="notes-footer">
+        <span class="notes-count" id="notes-count">0 characters</span>
+        <button class="notes-clear" onclick="noteClear()">Clear</button>
+      </div>
+    </div>
+  </div>
 
-      else if (action === 'op') {
-        if (operator && !resetNext) compute();
-        prev = current;
-        operator = val;
-        resetNext = true;
-        const sym = { '/':'÷', '*':'×', '-':'−', '+':'+' }[val];
-        exprEl.textContent = `${prev} ${sym}`;
-        update(); return;
-      }
+  <!-- ══════════ APP: COLOR ══════════ -->
+  <div class="app-view" id="app-color">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Color Picker</span>
+    </div>
+    <div class="app-body">
+      <div class="color-preview" id="color-preview"></div>
+      <div class="color-hex" id="color-hex" onclick="copyHex()" title="Tap to copy">
+        #FF0000
+        <span>tap to copy hex</span>
+      </div>
+      <div class="slider-group">
+        <label>Hue <span id="lbl-h">0</span>°</label>
+        <input type="range" id="sl-h" min="0" max="360" value="0" oninput="updateColor()">
+      </div>
+      <div class="slider-group">
+        <label>Saturation <span id="lbl-s">100</span>%</label>
+        <input type="range" id="sl-s" min="0" max="100" value="100" oninput="updateColor()">
+      </div>
+      <div class="slider-group">
+        <label>Lightness <span id="lbl-l">50</span>%</label>
+        <input type="range" id="sl-l" min="0" max="100" value="50" oninput="updateColor()">
+      </div>
+      <div class="color-swatches" id="swatches"></div>
+    </div>
+  </div>
 
-      else if (action === 'equals') {
-        if (!operator) return;
-        exprEl.textContent = `${prev} ${{ '/':'÷', '*':'×', '-':'−', '+':'+' }[operator]} ${current} =`;
-        compute();
-        operator = null;
-        update(); return;
-      }
+  <!-- ══════════ APP: DICE ══════════ -->
+  <div class="app-view" id="app-dice">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Dice Roller</span>
+    </div>
+    <div class="app-body">
+      <div class="dice-center">
+        <div class="dice-selector" id="dice-selector">
+          <div class="dice-type active" data-sides="6" onclick="selectDie(this)">D6</div>
+          <div class="dice-type" data-sides="4" onclick="selectDie(this)">D4</div>
+          <div class="dice-type" data-sides="8" onclick="selectDie(this)">D8</div>
+          <div class="dice-type" data-sides="10" onclick="selectDie(this)">D10</div>
+          <div class="dice-type" data-sides="12" onclick="selectDie(this)">D12</div>
+          <div class="dice-type" data-sides="20" onclick="selectDie(this)">D20</div>
+          <div class="dice-type" data-sides="100" onclick="selectDie(this)">D100</div>
+        </div>
+        <div class="dice-face" id="dice-face" onclick="rollDice()">⚀</div>
+        <div class="dice-hint">Tap die to roll</div>
+        <div class="dice-history" id="dice-history"></div>
+      </div>
+    </div>
+  </div>
 
-      else if (action === 'clear') {
-        current = '0'; prev = null; operator = null; resetNext = false;
-        exprEl.textContent = '';
-      }
+  <!-- ══════════ APP: TIP CALCULATOR ══════════ -->
+  <div class="app-view" id="app-tip">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Tip Calculator</span>
+    </div>
+    <div class="app-body">
+      <div class="tip-field">
+        <label>Bill Amount ($)</label>
+        <input class="tip-input" id="tip-bill" type="number" inputmode="decimal" placeholder="0.00" oninput="calcTip()">
+      </div>
+      <div class="tip-field">
+        <label>Tip Percentage</label>
+        <div class="tip-pcts">
+          <div class="tip-pct" data-pct="10" onclick="setPct(this)">10%</div>
+          <div class="tip-pct active" data-pct="15" onclick="setPct(this)">15%</div>
+          <div class="tip-pct" data-pct="18" onclick="setPct(this)">18%</div>
+          <div class="tip-pct" data-pct="20" onclick="setPct(this)">20%</div>
+          <div class="tip-pct" data-pct="25" onclick="setPct(this)">25%</div>
+        </div>
+      </div>
+      <div class="tip-field">
+        <label>Split Between</label>
+        <input class="tip-input" id="tip-split" type="number" inputmode="numeric" value="1" min="1" oninput="calcTip()">
+      </div>
+      <div class="tip-result-grid">
+        <div class="tip-card"><div class="tc-val" id="tip-amount">$0.00</div><div class="tc-lbl">Tip</div></div>
+        <div class="tip-card"><div class="tc-val" id="tip-total">$0.00</div><div class="tc-lbl">Total</div></div>
+        <div class="tip-card"><div class="tc-val" id="tip-per">$0.00</div><div class="tc-lbl">Per Person</div></div>
+        <div class="tip-card"><div class="tc-val" id="tip-tip-per">$0.00</div><div class="tc-lbl">Tip / Person</div></div>
+      </div>
+    </div>
+  </div>
 
-      else if (action === 'sign') {
-        current = String(parseFloat(current) * -1);
-      }
+  <!-- ══════════ APP: BMI ══════════ -->
+  <div class="app-view" id="app-bmi">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">BMI Calculator</span>
+    </div>
+    <div class="app-body">
+      <div class="bmi-toggle">
+        <div class="bmi-unit-btn active" id="bmi-metric-btn" onclick="setBmiUnit('metric')">Metric (kg/cm)</div>
+        <div class="bmi-unit-btn" id="bmi-imperial-btn" onclick="setBmiUnit('imperial')">Imperial (lb/in)</div>
+      </div>
+      <div class="tip-field">
+        <label id="bmi-weight-lbl">Weight (kg)</label>
+        <input class="tip-input" id="bmi-weight" type="number" inputmode="decimal" placeholder="70" oninput="calcBmi()">
+      </div>
+      <div class="tip-field">
+        <label id="bmi-height-lbl">Height (cm)</label>
+        <input class="tip-input" id="bmi-height" type="number" inputmode="decimal" placeholder="175" oninput="calcBmi()">
+      </div>
+      <div class="bmi-result">
+        <div class="bmi-val" id="bmi-value">—</div>
+        <div class="bmi-cat" id="bmi-cat"></div>
+      </div>
+      <div class="bmi-gauge"><div class="bmi-needle" id="bmi-needle" style="left:0%"></div></div>
+      <div class="bmi-labels"><span>Underweight</span><span>Normal</span><span>Overweight</span><span>Obese</span></div>
+    </div>
+  </div>
 
-      else if (action === 'percent') {
-        current = String(parseFloat(current) / 100);
-      }
+  <!-- ══════════ APP: UNIT CONVERTER ══════════ -->
+  <div class="app-view" id="app-unit">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Unit Converter</span>
+    </div>
+    <div class="app-body">
+      <div class="unit-cats" id="unit-cats">
+        <div class="unit-cat active" data-cat="length" onclick="setUnitCat(this)">Length</div>
+        <div class="unit-cat" data-cat="weight" onclick="setUnitCat(this)">Weight</div>
+        <div class="unit-cat" data-cat="temp" onclick="setUnitCat(this)">Temp</div>
+        <div class="unit-cat" data-cat="speed" onclick="setUnitCat(this)">Speed</div>
+        <div class="unit-cat" data-cat="area" onclick="setUnitCat(this)">Area</div>
+      </div>
+      <div class="unit-row">
+        <input class="unit-input" id="unit-from-val" type="number" inputmode="decimal" placeholder="0" oninput="convertUnits()">
+        <select id="unit-from-sel" onchange="convertUnits()"></select>
+      </div>
+      <div style="text-align:center;margin-bottom:0.5rem">
+        <div class="unit-swap" onclick="swapUnits()">⇅</div>
+      </div>
+      <div class="unit-row">
+        <input class="unit-input" id="unit-to-val" type="number" inputmode="decimal" placeholder="0" readonly style="opacity:0.7">
+        <select id="unit-to-sel" onchange="convertUnits()"></select>
+      </div>
+    </div>
+  </div>
 
-      update();
-    });
+</div><!-- /shell -->
 
-    function compute() {
-      const a = parseFloat(prev), b = parseFloat(current);
-      let r;
-      if (operator === '+') r = a + b;
-      else if (operator === '-') r = a - b;
-      else if (operator === '*') r = a * b;
-      else if (operator === '/') r = b === 0 ? 'Error' : a / b;
-      current = r === 'Error' ? 'Error' : String(+r.toFixed(10));
-      resetNext = true;
-    }
+<script>
+/* ══════════════════════════════════════════
+   ROUTER
+══════════════════════════════════════════ */
+let currentApp = null;
+function openApp(id) {
+  currentApp = id;
+  document.getElementById('app-' + id).classList.add('open');
+  if (id === 'clock') startClock();
+  if (id === 'color') updateColor();
+  if (id === 'unit') initUnits();
+}
+function closeApp() {
+  if (!currentApp) return;
+  document.getElementById('app-' + currentApp).classList.remove('open');
+  currentApp = null;
+}
 
-    // Keyboard support
-    document.addEventListener('keydown', e => {
-      const map = {
-        '0':'0','1':'1','2':'2','3':'3','4':'4',
-        '5':'5','6':'6','7':'7','8':'8','9':'9',
-        '.':'.', ',':'.',
-        '+':'+', '-':'-', '*':'*', '/':'/',
-        'Enter':'=', '=':'=',
-        'Backspace':'back', 'Escape':'clear', '%':'%'
-      };
-      const a = map[e.key];
-      if (!a) return;
-      e.preventDefault();
-      if (a === 'back') {
-        current = current.length > 1 ? current.slice(0,-1) : '0';
-        update(); return;
-      }
-      const btn = [...document.querySelectorAll('.btn')].find(b => {
-        if (a === 'clear') return b.dataset.action === 'clear';
-        if (a === '=')     return b.dataset.action === 'equals';
-        if (a === '%')     return b.dataset.action === 'percent';
-        if ('+-*/'.includes(a)) return b.dataset.action === 'op' && b.dataset.val === a;
-        if (a === '.')     return b.dataset.action === 'dot';
-        return b.dataset.action === 'digit' && b.dataset.val === a;
-      });
-      btn && btn.click();
-    });
-  </script>
+/* ══════════════════════════════════════════
+   STATUS BAR + HOME CLOCK
+══════════════════════════════════════════ */
+function tickHome() {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const t = `${h}:${String(m).padStart(2,'0')}`;
+  document.getElementById('sb-time').textContent = t;
+  document.getElementById('home-clock').textContent = t;
+  document.getElementById('home-day').textContent =
+    now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+}
+tickHome();
+setInterval(tickHome, 10000);
+
+/* ══════════════════════════════════════════
+   CALCULATOR
+══════════════════════════════════════════ */
+let cCur='0', cPrev=null, cOp=null, cReset=false;
+const cDisp = () => document.getElementById('calc-result');
+const cExpr = () => document.getElementById('calc-expr');
+const cUpd  = () => { cDisp().textContent = cCur.length > 12 ? (+cCur).toExponential(4) : cCur; };
+
+document.getElementById('app-calculator').addEventListener('click', e => {
+  const btn = e.target.closest('.cbtn'); if (!btn) return;
+  const {action, val} = btn.dataset;
+  if (action === 'digit') {
+    if (cReset) { cCur = val; cReset = false; }
+    else cCur = cCur === '0' ? val : cCur + val;
+    if (cCur.length > 15) cCur = cCur.slice(0,15);
+  } else if (action === 'dot') {
+    if (cReset) { cCur='0.'; cReset=false; return cUpd(); }
+    if (!cCur.includes('.')) cCur += '.';
+  } else if (action === 'op') {
+    if (cOp && !cReset) cCompute();
+    cPrev = cCur; cOp = val; cReset = true;
+    const sym = {'/':'÷','*':'×','-':'−','+':'+'}[val];
+    cExpr().textContent = `${cPrev} ${sym}`;
+    cUpd(); return;
+  } else if (action === 'equals') {
+    if (!cOp) return;
+    cExpr().textContent = `${cPrev} ${{'/':'÷','*':'×','-':'−','+':'+'}[cOp]} ${cCur} =`;
+    cCompute(); cOp = null; cUpd(); return;
+  } else if (action === 'clear') {
+    cCur='0'; cPrev=null; cOp=null; cReset=false; cExpr().textContent='';
+  } else if (action === 'sign') { cCur = String(parseFloat(cCur)*-1); }
+    else if (action === 'percent') { cCur = String(parseFloat(cCur)/100); }
+  cUpd();
+});
+function cCompute() {
+  const a=parseFloat(cPrev), b=parseFloat(cCur); let r;
+  if (cOp==='+') r=a+b; else if (cOp==='-') r=a-b;
+  else if (cOp==='*') r=a*b; else if (cOp==='/') r=b===0?'Error':a/b;
+  cCur = r==='Error' ? 'Error' : String(+r.toFixed(10)); cReset=true;
+}
+document.addEventListener('keydown', e => {
+  if (currentApp !== 'calculator') return;
+  const map={'0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
+    '.':'.', ',':'.', '+':'+','-':'-','*':'*','/':'/', 'Enter':'=','=':'=',
+    'Backspace':'back','Escape':'clear','%':'%'};
+  const a = map[e.key]; if (!a) return; e.preventDefault();
+  if (a==='back') { cCur = cCur.length>1 ? cCur.slice(0,-1) : '0'; cUpd(); return; }
+  const btn = [...document.querySelectorAll('.cbtn')].find(b => {
+    if (a==='clear') return b.dataset.action==='clear';
+    if (a==='=') return b.dataset.action==='equals';
+    if (a==='%') return b.dataset.action==='percent';
+    if ('+-*/'.includes(a)) return b.dataset.action==='op' && b.dataset.val===a;
+    if (a==='.') return b.dataset.action==='dot';
+    return b.dataset.action==='digit' && b.dataset.val===a;
+  });
+  btn && btn.click();
+});
+
+/* ══════════════════════════════════════════
+   CLOCK
+══════════════════════════════════════════ */
+let clockTick = null;
+function startClock() {
+  if (clockTick) return;
+  tickClock();
+  clockTick = setInterval(tickClock, 500);
+}
+function tickClock() {
+  const n = new Date();
+  const pad = v => String(v).padStart(2,'0');
+  document.getElementById('clk-time').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  document.getElementById('clk-date').textContent = n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('clk-h').textContent = n.getHours();
+  document.getElementById('clk-m').textContent = n.getMinutes();
+  document.getElementById('clk-s').textContent = n.getSeconds();
+}
+
+// Stopwatch
+let swRunning=false, swMs=0, swStart=null, swInterval=null;
+function swToggle() {
+  swRunning = !swRunning;
+  document.getElementById('sw-start').textContent = swRunning ? 'Stop' : 'Start';
+  document.getElementById('sw-start').className = swRunning ? 'sw-btn stop' : 'sw-btn start';
+  if (swRunning) { swStart = Date.now() - swMs; swInterval = setInterval(swTick, 100); }
+  else clearInterval(swInterval);
+}
+function swReset() {
+  clearInterval(swInterval); swRunning=false; swMs=0; swStart=null;
+  document.getElementById('sw-start').textContent='Start';
+  document.getElementById('sw-start').className='sw-btn start';
+  document.getElementById('sw-display').textContent='00:00.0';
+}
+function swTick() {
+  swMs = Date.now() - swStart;
+  const tot = Math.floor(swMs/100), d = Math.floor(tot%10), s = Math.floor(tot/10)%60, m = Math.floor(tot/600);
+  document.getElementById('sw-display').textContent =
+    `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${d}`;
+}
+
+/* ══════════════════════════════════════════
+   NOTES
+══════════════════════════════════════════ */
+const notesArea = document.getElementById('notes-area');
+const savedNote = localStorage.getItem('minios-notes') || '';
+notesArea.value = savedNote;
+notesArea.addEventListener('input', () => {
+  document.getElementById('notes-count').textContent = notesArea.value.length + ' characters';
+  localStorage.setItem('minios-notes', notesArea.value);
+});
+document.getElementById('notes-count').textContent = savedNote.length + ' characters';
+function noteClear() {
+  notesArea.value = ''; notesArea.dispatchEvent(new Event('input'));
+}
+
+/* ══════════════════════════════════════════
+   COLOR PICKER
+══════════════════════════════════════════ */
+function hslToHex(h,s,l) {
+  s/=100; l/=100;
+  const a=s*Math.min(l,1-l);
+  const f=n=>{ const k=(n+h/30)%12; const c=l-a*Math.max(Math.min(k-3,9-k,1),-1);
+    return Math.round(255*c).toString(16).padStart(2,'0'); };
+  return '#'+f(0)+f(8)+f(4);
+}
+function updateColor() {
+  const h=+document.getElementById('sl-h').value;
+  const s=+document.getElementById('sl-s').value;
+  const l=+document.getElementById('sl-l').value;
+  document.getElementById('lbl-h').textContent=h;
+  document.getElementById('lbl-s').textContent=s;
+  document.getElementById('lbl-l').textContent=l;
+  const hex=hslToHex(h,s,l).toUpperCase();
+  document.getElementById('color-preview').style.background=`hsl(${h},${s}%,${l}%)`;
+  document.getElementById('color-hex').childNodes[0].textContent=hex;
+  document.getElementById('color-hex').dataset.hex=hex;
+}
+function copyHex() {
+  const hex=document.getElementById('color-hex').dataset.hex||'';
+  if(navigator.clipboard) navigator.clipboard.writeText(hex).catch(()=>{});
+  const el=document.getElementById('color-hex');
+  const orig=el.childNodes[0].textContent;
+  el.childNodes[0].textContent='Copied!'; setTimeout(()=>el.childNodes[0].textContent=orig,1200);
+}
+// Build swatches
+const swatchColors = ['#FF6B6B','#FF9F43','#FECA57','#48DBFB','#1DD1A1','#54A0FF','#5F27CD','#FF9FF3','#FFFFFF','#636E72','#2D3436','#000000'];
+const swatchEl = document.getElementById('swatches');
+swatchColors.forEach(c => {
+  const d=document.createElement('div'); d.className='swatch';
+  d.style.background=c; d.title=c;
+  d.onclick=()=>{ /* convert hex to hsl and set sliders */
+    const r=parseInt(c.slice(1,3),16)/255, g=parseInt(c.slice(3,5),16)/255, b=parseInt(c.slice(5,7),16)/255;
+    const max=Math.max(r,g,b),min=Math.min(r,g,b); let h,s,l=(max+min)/2;
+    if(max===min){h=s=0;}else{const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
+      switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h/=6;}
+    document.getElementById('sl-h').value=Math.round(h*360);
+    document.getElementById('sl-s').value=Math.round(s*100);
+    document.getElementById('sl-l').value=Math.round(l*100);
+    updateColor();
+  };
+  swatchEl.appendChild(d);
+});
+updateColor();
+
+/* ══════════════════════════════════════════
+   DICE
+══════════════════════════════════════════ */
+const D6_FACES=['⚀','⚁','⚂','⚃','⚄','⚅'];
+let diceSides=6, diceHistory=[];
+function selectDie(el) {
+  document.querySelectorAll('.dice-type').forEach(d=>d.classList.remove('active'));
+  el.classList.add('active');
+  diceSides=+el.dataset.sides;
+  document.getElementById('dice-face').textContent=diceSides===6?'⚀':'?';
+}
+function rollDice() {
+  const face=document.getElementById('dice-face');
+  face.classList.remove('roll'); void face.offsetWidth; face.classList.add('roll');
+  const val=Math.floor(Math.random()*diceSides)+1;
+  face.textContent = diceSides===6 ? D6_FACES[val-1] : val;
+  diceHistory.unshift(val); if(diceHistory.length>8) diceHistory.pop();
+  const h=document.getElementById('dice-history');
+  h.innerHTML=diceHistory.map(v=>`<div class="dice-hist-item">${v}</div>`).join('');
+}
+
+/* ══════════════════════════════════════════
+   TIP CALCULATOR
+══════════════════════════════════════════ */
+let tipPct=15;
+function setPct(el) {
+  document.querySelectorAll('.tip-pct').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active'); tipPct=+el.dataset.pct; calcTip();
+}
+function calcTip() {
+  const bill=parseFloat(document.getElementById('tip-bill').value)||0;
+  const split=Math.max(1,parseInt(document.getElementById('tip-split').value)||1);
+  const tip=bill*(tipPct/100), total=bill+tip;
+  const fmt=v=>'$'+v.toFixed(2);
+  document.getElementById('tip-amount').textContent=fmt(tip);
+  document.getElementById('tip-total').textContent=fmt(total);
+  document.getElementById('tip-per').textContent=fmt(total/split);
+  document.getElementById('tip-tip-per').textContent=fmt(tip/split);
+}
+
+/* ══════════════════════════════════════════
+   BMI
+══════════════════════════════════════════ */
+let bmiUnit='metric';
+function setBmiUnit(u) {
+  bmiUnit=u;
+  document.getElementById('bmi-metric-btn').className='bmi-unit-btn'+(u==='metric'?' active':'');
+  document.getElementById('bmi-imperial-btn').className='bmi-unit-btn'+(u==='imperial'?' active':'');
+  document.getElementById('bmi-weight-lbl').textContent='Weight '+(u==='metric'?'(kg)':'(lb)');
+  document.getElementById('bmi-height-lbl').textContent='Height '+(u==='metric'?'(cm)':'(in)');
+  calcBmi();
+}
+function calcBmi() {
+  let w=parseFloat(document.getElementById('bmi-weight').value);
+  let h=parseFloat(document.getElementById('bmi-height').value);
+  if(!w||!h||w<=0||h<=0){document.getElementById('bmi-value').textContent='—';document.getElementById('bmi-cat').textContent='';document.getElementById('bmi-needle').style.left='0%';return;}
+  let bmi;
+  if(bmiUnit==='metric'){bmi=w/((h/100)**2);}
+  else{bmi=(703*w)/(h*h);}
+  bmi=Math.round(bmi*10)/10;
+  document.getElementById('bmi-value').textContent=bmi;
+  let cat='',col='';
+  if(bmi<18.5){cat='Underweight';col='#0a84ff';}
+  else if(bmi<25){cat='Normal weight';col='#30d158';}
+  else if(bmi<30){cat='Overweight';col='#ffd60a';}
+  else{cat='Obese';col='#ff453a';}
+  document.getElementById('bmi-cat').textContent=cat;
+  document.getElementById('bmi-cat').style.color=col;
+  // needle: 10=0%, 40=100%
+  const pct=Math.min(100,Math.max(0,(bmi-10)/30*100));
+  document.getElementById('bmi-needle').style.left=pct+'%';
+}
+
+/* ══════════════════════════════════════════
+   UNIT CONVERTER
+══════════════════════════════════════════ */
+const unitData = {
+  length: {
+    units:['Meter','Kilometer','Centimeter','Millimeter','Mile','Yard','Foot','Inch','Nautical Mile'],
+    toBase:[1,1000,0.01,0.001,1609.344,0.9144,0.3048,0.0254,1852]
+  },
+  weight: {
+    units:['Kilogram','Gram','Milligram','Pound','Ounce','Stone','Tonne'],
+    toBase:[1,0.001,0.000001,0.453592,0.0283495,6.35029,1000]
+  },
+  temp: { units:['Celsius','Fahrenheit','Kelvin'], toBase:null },
+  speed: {
+    units:['m/s','km/h','mph','knot','ft/s'],
+    toBase:[1,0.277778,0.44704,0.514444,0.3048]
+  },
+  area: {
+    units:['m²','km²','cm²','Hectare','Acre','ft²','in²'],
+    toBase:[1,1e6,0.0001,10000,4046.86,0.092903,0.00064516]
+  }
+};
+let unitCat='length';
+function initUnits() { setUnitCat(document.querySelector('.unit-cat.active')); }
+function setUnitCat(el) {
+  document.querySelectorAll('.unit-cat').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active'); unitCat=el.dataset.cat;
+  const d=unitData[unitCat];
+  const fs=document.getElementById('unit-from-sel'), ts=document.getElementById('unit-to-sel');
+  fs.innerHTML=ts.innerHTML=d.units.map((u,i)=>`<option value="${i}">${u}</option>`).join('');
+  ts.value=1; convertUnits();
+}
+function convertUnits() {
+  const fi=+document.getElementById('unit-from-sel').value;
+  const ti=+document.getElementById('unit-to-sel').value;
+  const val=parseFloat(document.getElementById('unit-from-val').value)||0;
+  const d=unitData[unitCat]; let result;
+  if(unitCat==='temp') {
+    let c; // to celsius first
+    if(fi===0) c=val; else if(fi===1) c=(val-32)*5/9; else c=val-273.15;
+    if(ti===0) result=c; else if(ti===1) result=c*9/5+32; else result=c+273.15;
+  } else {
+    const base=val*d.toBase[fi];
+    result=base/d.toBase[ti];
+  }
+  document.getElementById('unit-to-val').value=parseFloat(result.toFixed(8));
+}
+function swapUnits() {
+  const fs=document.getElementById('unit-from-sel'), ts=document.getElementById('unit-to-sel');
+  const fv=fs.value, tv=ts.value, fval=document.getElementById('unit-from-val').value;
+  fs.value=tv; ts.value=fv;
+  document.getElementById('unit-from-val').value=document.getElementById('unit-to-val').value||fval;
+  convertUnits();
+}
+</script>
 </body>
 </html>
