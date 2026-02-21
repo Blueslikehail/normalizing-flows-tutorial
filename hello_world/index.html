@@ -1054,7 +1054,7 @@
       <span class="app-title">Python REPL</span>
     </div>
     <div class="app-body">
-      <div class="py-status" id="py-status">Connecting to Jupyter on :8889…</div>
+      <div class="py-status" id="py-status">Tap ▶ to load Python (Pyodide, ~10 MB)</div>
       <div class="py-snippets">
         <div class="py-snippet" onclick="pySnippet('print(\"Hello from Python!\")')">hello</div>
         <div class="py-snippet" onclick="pySnippet('import math\nmath.sqrt(2)')">math</div>
@@ -1068,7 +1068,6 @@
       </div>
       <div class="py-action-row">
         <div class="py-action-btn" onclick="pyClear()">Clear output</div>
-        <div class="py-action-btn" onclick="initPython()">Reconnect</div>
       </div>
     </div>
   </div>
@@ -1853,87 +1852,67 @@ function handleTouch(e) {
 }
 
 /* ══════════════════════════════════════════
-   PYTHON REPL  — Jupyter kernel via WebSocket
+   PYTHON REPL  — Pyodide (Python 3 via WASM, runs entirely in browser)
 ══════════════════════════════════════════ */
-let pyKernelId = null, pyWs = null, pyBusy = false;
+let pyodide = null, pyLoading = false;
 
 async function initPython() {
-  if (pyWs && pyWs.readyState === WebSocket.OPEN) return;
+  if (pyodide)   return;
+  if (pyLoading) return;
+  pyLoading = true;
+
   const status = document.getElementById('py-status');
   const btn    = document.getElementById('py-run-btn');
-  status.textContent = 'Connecting to Jupyter on :8889…';
+  status.textContent = 'Loading Python runtime (~10 MB, cached after first load)…';
   status.className   = 'py-status';
   btn.disabled = true;
 
   try {
-    const res = await fetch('http://localhost:8889/api/kernels', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'python3' })
+    if (!window.loadPyodide) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    status.textContent = 'Starting Python 3…';
+    pyodide = await loadPyodide({
+      indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const kernel = await res.json();
-    pyKernelId = kernel.id;
+    pyodide.setStdout({ batched: s => pyAppendLine(s, 'output') });
+    pyodide.setStderr({ batched: s => pyAppendLine(s, 'error')  });
 
-    pyWs = new WebSocket(`ws://localhost:8889/api/kernels/${pyKernelId}/channels`);
-
-    pyWs.onopen = () => {
-      status.textContent = '● Connected to Python 3 kernel';
-      status.className   = 'py-status connected';
-      btn.disabled = false;
-      pyAppendLine('Ready — try a snippet above or write your own code', 'hint');
-    };
-
-    pyWs.onmessage = e => {
-      const msg = JSON.parse(e.data);
-      const { msg_type, content } = msg;
-      if (msg_type === 'stream') {
-        content.text.split('\n').forEach(l => l && pyAppendLine(l,
-          content.name === 'stderr' ? 'error' : 'output'));
-      } else if (msg_type === 'execute_result') {
-        pyAppendLine((content.data['text/plain'] || '').trim(), 'result');
-      } else if (msg_type === 'error') {
-        (content.traceback || []).forEach(l =>
-          pyAppendLine(l.replace(/\x1b\[[0-9;]*m/g, ''), 'error'));
-      } else if (msg_type === 'execute_reply' || (msg_type === 'status' && content.execution_state === 'idle')) {
-        if (pyBusy) { pyBusy = false; btn.disabled = false; }
-      }
-    };
-
-    pyWs.onerror = () => {
-      status.textContent = '✗ WebSocket error';
-      status.className   = 'py-status error';
-    };
-    pyWs.onclose = () => {
-      if (status.className.includes('connected')) {
-        status.textContent = 'Disconnected — tap Reconnect';
-        status.className   = 'py-status error';
-        btn.disabled = true;
-      }
-    };
+    status.textContent = '● Python 3 ready (Pyodide — runs in browser, no server needed)';
+    status.className   = 'py-status connected';
+    btn.disabled = false;
+    pyLoading = false;
+    const ver = pyodide.runPython('import sys; sys.version.split()[0]');
+    pyAppendLine('Python ' + ver + ' · numpy, scipy, matplotlib available', 'hint');
+    pyAppendLine('Try a snippet above or write your own code below', 'hint');
 
   } catch (e) {
-    status.textContent = '✗ Jupyter not reachable — run: bash launch_jupyter.sh';
+    status.textContent = '✗ Failed to load Pyodide: ' + e.message;
     status.className   = 'py-status error';
-    pyAppendLine('Then open: http://localhost:8889', 'hint');
+    pyLoading = false;
   }
 }
 
-function pyRun() {
+async function pyRun() {
+  if (!pyodide) return;
   const code = document.getElementById('py-input').value.trim();
-  if (!code || !pyWs || pyWs.readyState !== WebSocket.OPEN || pyBusy) return;
-  pyBusy = true;
-  document.getElementById('py-run-btn').disabled = true;
+  if (!code) return;
+  const btn = document.getElementById('py-run-btn');
+  btn.disabled = true;
   pyAppendLine('>>> ' + code.replace(/\n/g, '\n    '), 'prompt');
-  pyWs.send(JSON.stringify({
-    header: { msg_id: 'id-' + Date.now(), username: 'user',
-              session: 'sess-' + Date.now(), msg_type: 'execute_request',
-              version: '5.0', date: new Date().toISOString() },
-    parent_header: {}, metadata: {},
-    content: { code, silent: false, store_history: true,
-               user_expressions: {}, allow_stdin: false },
-    channel: 'shell', buffers: []
-  }));
+  try {
+    await pyodide.loadPackagesFromImports(code);   // auto-loads numpy etc.
+    const result = await pyodide.runPythonAsync(code);
+    if (result !== undefined && result !== null) pyAppendLine(String(result), 'result');
+  } catch (e) {
+    pyAppendLine(e.message.split('\n').pop() || e.message, 'error');
+  }
+  btn.disabled = false;
 }
 
 function pySnippet(code) {
