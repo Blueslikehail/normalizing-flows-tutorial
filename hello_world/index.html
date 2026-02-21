@@ -1620,13 +1620,14 @@ function handleTouch(e) {
     return;
   }
 
-  // Detect API support once from first touch, before the loop,
-  // so all dots use the same opacity formula.
-  const forceSupported = touches[0].force !== undefined;
+  // Detect API existence before the loop so all dots share the same formula.
+  // Force: spec requires 0–1. Some Android devices define touch.force but return
+  // raw hardware values outside that range (e.g. 24.28) — treat as unsupported.
+  const forceApiExists = touches[0].force !== undefined;
   const areaSupported  = touches[0].radiusX !== undefined;
 
   const rect = pad.getBoundingClientRect();
-  let totalForce = 0, totalArea = 0, areaCount = 0;
+  let totalForce = 0, forceValid = forceApiExists, totalArea = 0, areaCount = 0;
 
   for (let i = 0; i < touches.length; i++) {
     const t  = touches[i];
@@ -1635,7 +1636,13 @@ function handleTouch(e) {
     const rx = t.radiusX || 0;
     const ry = t.radiusY || rx; // fall back to rx if ry missing
 
-    if (forceSupported) totalForce += t.force;
+    if (forceApiExists) {
+      if (t.force < 0 || t.force > 1) {
+        forceValid = false; // non-spec value — don't trust this device's readings
+      } else {
+        totalForce += t.force;
+      }
+    }
     if (areaSupported && (rx > 0 || ry > 0)) {
       totalArea += Math.PI * rx * ry;
       areaCount++;
@@ -1644,14 +1651,15 @@ function handleTouch(e) {
     const dot = document.createElement('div');
     dot.className = 'touch-dot';
     const size    = Math.max(28, (rx || 14) * 2);
-    const opacity = forceSupported ? (0.3 + t.force * 0.7) : 0.75;
+    const opacity = (forceValid && t.force >= 0 && t.force <= 1)
+      ? (0.3 + t.force * 0.7) : 0.75;
     dot.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:${opacity}`;
     pad.appendChild(dot);
   }
 
-  // Average per finger so adding fingers doesn't make values jump
+  // Show as percentage (more intuitive than raw 0–1 decimal)
   document.getElementById('touch-force').textContent =
-    forceSupported ? (totalForce / count).toFixed(2) : 'N/A';
+    forceValid ? Math.round(totalForce / count * 100) + '%' : 'N/A';
   document.getElementById('touch-area').textContent  =
     (areaSupported && areaCount > 0) ? Math.round(totalArea / areaCount) + ' px²' : 'N/A';
 }
