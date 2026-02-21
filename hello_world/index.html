@@ -1602,39 +1602,58 @@ function initTouchPad() {
 }
 
 function handleTouch(e) {
-  const pad   = document.getElementById('touch-pad');
+  const pad     = document.getElementById('touch-pad');
   const touches = e.touches;
-  const count = touches.length;
+  const count   = touches.length;
+
   if (count > touchMaxFingers) {
     touchMaxFingers = count;
     document.getElementById('touch-max').textContent = touchMaxFingers;
   }
   document.getElementById('touch-count').textContent = count;
-  // Remove previous dots
+
   pad.querySelectorAll('.touch-dot').forEach(d => d.remove());
-  let totalForce = 0, hasForce = false, totalArea = 0, hasArea = false;
+
+  if (count === 0) {
+    document.getElementById('touch-force').textContent = '—';
+    document.getElementById('touch-area').textContent  = '—';
+    return;
+  }
+
+  // Detect API support once from first touch, before the loop,
+  // so all dots use the same opacity formula.
+  const forceSupported = touches[0].force !== undefined;
+  const areaSupported  = touches[0].radiusX !== undefined;
+
   const rect = pad.getBoundingClientRect();
+  let totalForce = 0, totalArea = 0, areaCount = 0;
+
   for (let i = 0; i < touches.length; i++) {
-    const t = touches[i];
-    const x = ((t.clientX - rect.left) / rect.width)  * 100;
-    const y = ((t.clientY - rect.top)  / rect.height) * 100;
-    if (t.force > 0) { totalForce += t.force; hasForce = true; }
-    const rx = t.radiusX || 0, ry = t.radiusY || 0;
-    if (rx > 0 && ry > 0) { totalArea += Math.round(Math.PI * rx * ry); hasArea = true; }
+    const t  = touches[i];
+    const x  = ((t.clientX - rect.left) / rect.width)  * 100;
+    const y  = ((t.clientY - rect.top)  / rect.height) * 100;
+    const rx = t.radiusX || 0;
+    const ry = t.radiusY || rx; // fall back to rx if ry missing
+
+    if (forceSupported) totalForce += t.force;
+    if (areaSupported && (rx > 0 || ry > 0)) {
+      totalArea += Math.PI * rx * ry;
+      areaCount++;
+    }
+
     const dot = document.createElement('div');
     dot.className = 'touch-dot';
-    const size = Math.max(28, (rx || 14) * 2);
-    const opacity = hasForce ? (0.4 + t.force * 0.6) : 0.75;
+    const size    = Math.max(28, (rx || 14) * 2);
+    const opacity = forceSupported ? (0.3 + t.force * 0.7) : 0.75;
     dot.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:${opacity}`;
     pad.appendChild(dot);
   }
-  if (count > 0) {
-    document.getElementById('touch-force').textContent = hasForce ? (totalForce / count).toFixed(2) : 'N/A';
-    document.getElementById('touch-area').textContent  = hasArea  ? totalArea : 'N/A';
-  } else {
-    document.getElementById('touch-force').textContent = '—';
-    document.getElementById('touch-area').textContent  = '—';
-  }
+
+  // Average per finger so adding fingers doesn't make values jump
+  document.getElementById('touch-force').textContent =
+    forceSupported ? (totalForce / count).toFixed(2) : 'N/A';
+  document.getElementById('touch-area').textContent  =
+    (areaSupported && areaCount > 0) ? Math.round(totalArea / areaCount) + ' px²' : 'N/A';
 }
 </script>
 </body>
