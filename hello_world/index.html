@@ -849,10 +849,14 @@
         <div class="sensor-grid">
           <div class="sensor-card"><div class="s-val" id="bat-level">—</div><div class="s-lbl">Battery</div></div>
           <div class="sensor-card"><div class="s-val" id="bat-charge">—</div><div class="s-lbl">Charging</div></div>
-          <div class="sensor-card"><div class="s-val" id="net-type">—</div><div class="s-lbl">Network</div></div>
-          <div class="sensor-card"><div class="s-val" id="net-speed">—</div><div class="s-lbl">Downlink Mbps</div></div>
+          <div class="sensor-card"><div class="s-val" id="net-online">—</div><div class="s-lbl">Online</div></div>
+          <div class="sensor-card"><div class="s-val" id="net-type">—</div><div class="s-lbl">Connection</div></div>
           <div class="sensor-card"><div class="s-val" id="scr-ori">—</div><div class="s-lbl">Orientation</div></div>
+          <div class="sensor-card"><div class="s-val" id="scr-dpr">—</div><div class="s-lbl">Pixel Ratio</div></div>
           <div class="sensor-card"><div class="s-val" id="scr-size">—</div><div class="s-lbl">Screen px</div></div>
+          <div class="sensor-card"><div class="s-val" id="dev-cpu">—</div><div class="s-lbl">CPU Cores</div></div>
+          <div class="sensor-card"><div class="s-val" id="dev-lang">—</div><div class="s-lbl">Language</div></div>
+          <div class="sensor-card"><div class="s-val" id="dev-mem">—</div><div class="s-lbl">RAM (GB)</div></div>
         </div>
       </div>
 
@@ -1195,26 +1199,6 @@ function initSensors() {
   if (sensorsInited) return;
   sensorsInited = true;
   updateDeviceInfo();
-
-  // Battery
-  if (navigator.getBattery) {
-    navigator.getBattery().then(bat => {
-      updateBattery(bat);
-      bat.addEventListener('chargingchange', () => updateBattery(bat));
-      bat.addEventListener('levelchange',    () => updateBattery(bat));
-    });
-  }
-
-  // Network
-  if (navigator.connection) {
-    updateNetwork();
-    navigator.connection.addEventListener('change', updateNetwork);
-  }
-
-  // Screen orientation changes
-  window.addEventListener('orientationchange', updateScreenOri);
-  window.addEventListener('resize', updateScreenOri);
-
   // Try auto-start motion (works on Android without a permission prompt)
   tryAutoMotion();
 }
@@ -1333,21 +1317,68 @@ function updateBattery(bat) {
 }
 
 function updateNetwork() {
+  // navigator.connection is Chrome/Android only — iOS returns undefined
+  document.getElementById('net-online').textContent = navigator.onLine ? '✓ Yes' : '✗ No';
   const c = navigator.connection;
-  document.getElementById('net-type').textContent  = c.effectiveType || c.type || '—';
-  document.getElementById('net-speed').textContent = c.downlink != null ? c.downlink : '—';
+  if (c) {
+    document.getElementById('net-type').textContent = c.effectiveType || c.type || '—';
+  } else {
+    document.getElementById('net-type').textContent = navigator.onLine ? 'Online' : 'Offline';
+  }
 }
 
 function updateDeviceInfo() {
+  // Screen — works everywhere
   document.getElementById('scr-size').textContent = `${screen.width}×${screen.height}`;
+  document.getElementById('scr-dpr').textContent  = window.devicePixelRatio || '—';
+
+  // CPU cores — works on most browsers
+  const cores = navigator.hardwareConcurrency;
+  document.getElementById('dev-cpu').textContent = cores || '—';
+
+  // Language — works everywhere
+  document.getElementById('dev-lang').textContent = navigator.language || '—';
+
+  // RAM — Chrome only (deviceMemory), not on iOS
+  const mem = navigator.deviceMemory;
+  document.getElementById('dev-mem').textContent = mem != null ? mem + ' GB' : 'N/A';
+
+  // Battery — Chrome/Android only, not on iOS Safari
+  if (navigator.getBattery) {
+    navigator.getBattery().then(bat => {
+      updateBattery(bat);
+      bat.addEventListener('chargingchange', () => updateBattery(bat));
+      bat.addEventListener('levelchange',    () => updateBattery(bat));
+    });
+  } else {
+    document.getElementById('bat-level').textContent  = 'N/A';
+    document.getElementById('bat-charge').textContent = 'N/A';
+  }
+
+  // Network
+  updateNetwork();
+  window.addEventListener('online',  updateNetwork);
+  window.addEventListener('offline', updateNetwork);
+  if (navigator.connection) navigator.connection.addEventListener('change', updateNetwork);
+
+  // Orientation
   updateScreenOri();
+  window.addEventListener('orientationchange', updateScreenOri);
+  window.addEventListener('resize', updateScreenOri);
 }
 
 function updateScreenOri() {
   const ori = window.screen.orientation;
-  document.getElementById('scr-ori').textContent = ori
-    ? ori.type.split('-')[0]
-    : (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait');
+  if (ori) {
+    document.getElementById('scr-ori').textContent = ori.type.split('-')[0];
+  } else if (typeof window.orientation !== 'undefined') {
+    // Deprecated but still works on iOS
+    document.getElementById('scr-ori').textContent =
+      Math.abs(window.orientation) === 90 ? 'landscape' : 'portrait';
+  } else {
+    document.getElementById('scr-ori').textContent =
+      window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+  }
 }
 </script>
 </body>
