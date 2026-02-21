@@ -501,6 +501,25 @@
       transform: translate(-50%,-50%); pointer-events: none;
       box-shadow: 0 0 12px rgba(10,132,255,0.5);
     }
+    /* ── Accelerometer threshold alert ── */
+    #acc-alert-toast {
+      position: fixed;
+      top: -70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff3b30;
+      color: #fff;
+      padding: 0.55rem 1.4rem;
+      border-radius: 2rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      z-index: 9999;
+      transition: top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(255,59,48,0.5);
+      pointer-events: none;
+    }
+    #acc-alert-toast.acc-toast-show { top: 3.5rem; }
   </style>
 </head>
 <body>
@@ -831,6 +850,10 @@
           <div class="sensor-bar-wrap">
             <div class="sensor-bar-label"><span>Z — up/down</span><span id="acc-z-val">0</span></div>
             <div class="sensor-bar-track"><div class="sensor-bar-fill" id="acc-z-bar" style="width:50%;background:#0a84ff"></div></div>
+          </div>
+          <div class="sensor-bar-wrap">
+            <div class="sensor-bar-label"><span>Magnitude  ·  threshold: 15 m/s²</span><span id="acc-mag-val">0</span></div>
+            <div class="sensor-bar-track"><div class="sensor-bar-fill" id="acc-mag-bar" style="width:0%;background:#30d158;transition:width 0.08s,background 0.2s"></div></div>
           </div>
           <div class="bubble-wrap">
             <div class="bubble-title">Bubble Level</div>
@@ -1272,6 +1295,8 @@ function swapUnits() {
 /* ══════════════════════════════════════════
    SENSORS
 ══════════════════════════════════════════ */
+const ACC_THRESHOLD = 15; // m/s² — alert + vibrate when magnitude exceeds this
+let alertCooldown = false;
 let motionActive = false, sensorsInited = false;
 
 function initSensors() {
@@ -1346,6 +1371,19 @@ function handleMotion(e) {
 
   const rAlpha = rot.alpha != null ? Math.abs(rot.alpha).toFixed(1) : '—';
   document.getElementById('rot-rate').textContent = rAlpha;
+
+  // Magnitude, threshold check, alert
+  const mag = Math.sqrt(x*x + y*y + z*z);
+  document.getElementById('acc-mag-val').textContent = mag.toFixed(1);
+  const magPct = Math.min(100, mag / (ACC_THRESHOLD * 1.5) * 100);
+  const magBar = document.getElementById('acc-mag-bar');
+  magBar.style.width = magPct + '%';
+  magBar.style.background = mag > ACC_THRESHOLD ? '#ff3b30' : '#30d158';
+  if (mag > ACC_THRESHOLD && !alertCooldown) {
+    alertCooldown = true;
+    triggerAccelAlert(mag);
+    setTimeout(() => { alertCooldown = false; }, 3000);
+  }
 }
 
 function handleOrientation(e) {
@@ -1368,6 +1406,14 @@ function handleOrientation(e) {
   const g = Math.round(209 * (1 - tilt));
   const rv = Math.round(255 * tilt);
   ball.style.background = `radial-gradient(circle at 35% 35%, rgb(${rv},${g},80), rgb(${Math.round(rv*.6)},${Math.round(g*.6)},40))`;
+}
+
+function triggerAccelAlert(mag) {
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  const toast = document.getElementById('acc-alert-toast');
+  toast.textContent = '⚠ High motion: ' + mag.toFixed(1) + ' m/s²';
+  toast.classList.add('acc-toast-show');
+  setTimeout(() => toast.classList.remove('acc-toast-show'), 2500);
 }
 
 function requestGPS() {
@@ -1664,5 +1710,6 @@ function handleTouch(e) {
     (areaSupported && areaCount > 0) ? Math.round(totalArea / areaCount) + ' px²' : 'N/A';
 }
 </script>
+<div id="acc-alert-toast"></div>
 </body>
 </html>
