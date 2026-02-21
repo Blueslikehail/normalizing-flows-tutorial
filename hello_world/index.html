@@ -110,6 +110,7 @@
     .ic-tip    { background: linear-gradient(135deg, #0a84ff, #0055d4); }
     .ic-bmi    { background: linear-gradient(135deg, #30d158, #00864d); }
     .ic-unit   { background: linear-gradient(135deg, #bf5af2, #8944ab); }
+    .ic-sensor { background: linear-gradient(135deg, #00b4d8, #7b2ff7); }
 
     /* ───── DOCK ───── */
     #dock {
@@ -433,6 +434,50 @@
     }
     .pill-btn:active { opacity: 0.75; }
     .section-sep { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+
+    /* ════════════════════════════
+       SENSORS
+    ════════════════════════════ */
+    .sensor-section { margin-bottom: 1rem; }
+    .sensor-section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.6rem; }
+    .sensor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .sensor-card { background: var(--glass); border: 1px solid var(--border); border-radius: 0.8rem; padding: 0.75rem; }
+    .sensor-card .s-val { font-size: 1.1rem; font-weight: 300; word-break: break-all; }
+    .sensor-card .s-lbl { font-size: 0.66rem; color: var(--muted); margin-top: 0.15rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .sensor-bar-wrap { margin-bottom: 0.55rem; }
+    .sensor-bar-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.2rem; }
+    .sensor-bar-label span:first-child { color: var(--muted); }
+    .sensor-bar-track { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; position: relative; }
+    .sensor-bar-fill { height: 100%; border-radius: 3px; transition: width 0.08s; min-width: 2px; }
+    .sensor-perm-btn {
+      width: 100%; padding: 0.7rem;
+      background: rgba(10,132,255,0.15); border: 1px solid #0a84ff;
+      border-radius: 0.7rem; color: #0a84ff;
+      font-size: 0.85rem; cursor: pointer; margin-bottom: 0.8rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sensor-status { font-size: 0.75rem; color: var(--muted); text-align: center; padding: 0.4rem; }
+    .sensor-active { color: #30d158 !important; }
+    /* Bubble level */
+    .bubble-wrap { display: flex; flex-direction: column; align-items: center; margin: 0.8rem 0; }
+    .bubble-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.6rem; }
+    .bubble-level {
+      width: min(150px, 42vw); height: min(150px, 42vw);
+      border-radius: 50%; border: 2px solid var(--border);
+      background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%);
+      position: relative; overflow: hidden;
+    }
+    .bubble-level::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.12); }
+    .bubble-level::after  { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.12); }
+    .bubble-center { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+    .bubble-ball {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #30d158, #00864d);
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      transition: transform 0.1s;
+    }
   </style>
 </head>
 <body>
@@ -486,6 +531,10 @@
       <div class="app-icon" onclick="openApp('unit')">
         <div class="app-icon-img ic-unit">📐</div>
         <div class="app-icon-label">Units</div>
+      </div>
+      <div class="app-icon" onclick="openApp('sensors')">
+        <div class="app-icon-img ic-sensor">📡</div>
+        <div class="app-icon-label">Sensors</div>
       </div>
     </div>
   </div>
@@ -734,6 +783,82 @@
     </div>
   </div>
 
+  <!-- ══════════ APP: SENSORS ══════════ -->
+  <div class="app-view" id="app-sensors">
+    <div class="app-topbar">
+      <button class="back-btn" onclick="closeApp()">Home</button>
+      <span class="app-title">Sensors</span>
+    </div>
+    <div class="app-body">
+
+      <!-- Motion -->
+      <div class="sensor-section">
+        <div class="sensor-section-title">Motion & Orientation</div>
+        <button class="sensor-perm-btn" id="motion-perm-btn" onclick="requestMotionPerm()">Enable Motion Sensors</button>
+        <div id="motion-status" class="sensor-status">Tap button above to start</div>
+        <div id="motion-data" style="display:none">
+          <div class="sensor-bar-wrap">
+            <div class="sensor-bar-label"><span>X — left/right</span><span id="acc-x-val">0</span></div>
+            <div class="sensor-bar-track"><div class="sensor-bar-fill" id="acc-x-bar" style="width:50%;background:#e94560"></div></div>
+          </div>
+          <div class="sensor-bar-wrap">
+            <div class="sensor-bar-label"><span>Y — forward/back</span><span id="acc-y-val">0</span></div>
+            <div class="sensor-bar-track"><div class="sensor-bar-fill" id="acc-y-bar" style="width:50%;background:#f5a623"></div></div>
+          </div>
+          <div class="sensor-bar-wrap">
+            <div class="sensor-bar-label"><span>Z — up/down</span><span id="acc-z-val">0</span></div>
+            <div class="sensor-bar-track"><div class="sensor-bar-fill" id="acc-z-bar" style="width:50%;background:#0a84ff"></div></div>
+          </div>
+          <div class="bubble-wrap">
+            <div class="bubble-title">Bubble Level</div>
+            <div class="bubble-level">
+              <div class="bubble-center"></div>
+              <div class="bubble-ball" id="bubble-ball"></div>
+            </div>
+          </div>
+          <div class="sensor-grid" style="margin-top:0.8rem">
+            <div class="sensor-card"><div class="s-val" id="ori-alpha">—</div><div class="s-lbl">Compass °</div></div>
+            <div class="sensor-card"><div class="s-val" id="ori-beta">—</div><div class="s-lbl">Tilt F/B °</div></div>
+            <div class="sensor-card"><div class="s-val" id="ori-gamma">—</div><div class="s-lbl">Tilt L/R °</div></div>
+            <div class="sensor-card"><div class="s-val" id="rot-rate">—</div><div class="s-lbl">Rot. Rate °/s</div></div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-sep">
+
+      <!-- GPS -->
+      <div class="sensor-section">
+        <div class="sensor-section-title">Location (GPS)</div>
+        <button class="sensor-perm-btn" id="gps-btn" onclick="requestGPS()">Get Location</button>
+        <div class="sensor-grid">
+          <div class="sensor-card"><div class="s-val" id="gps-lat">—</div><div class="s-lbl">Latitude</div></div>
+          <div class="sensor-card"><div class="s-val" id="gps-lon">—</div><div class="s-lbl">Longitude</div></div>
+          <div class="sensor-card"><div class="s-val" id="gps-acc">—</div><div class="s-lbl">Accuracy m</div></div>
+          <div class="sensor-card"><div class="s-val" id="gps-alt">—</div><div class="s-lbl">Altitude m</div></div>
+          <div class="sensor-card"><div class="s-val" id="gps-spd">—</div><div class="s-lbl">Speed m/s</div></div>
+          <div class="sensor-card"><div class="s-val" id="gps-hdg">—</div><div class="s-lbl">Heading °</div></div>
+        </div>
+      </div>
+
+      <hr class="section-sep">
+
+      <!-- Device -->
+      <div class="sensor-section">
+        <div class="sensor-section-title">Device</div>
+        <div class="sensor-grid">
+          <div class="sensor-card"><div class="s-val" id="bat-level">—</div><div class="s-lbl">Battery</div></div>
+          <div class="sensor-card"><div class="s-val" id="bat-charge">—</div><div class="s-lbl">Charging</div></div>
+          <div class="sensor-card"><div class="s-val" id="net-type">—</div><div class="s-lbl">Network</div></div>
+          <div class="sensor-card"><div class="s-val" id="net-speed">—</div><div class="s-lbl">Downlink Mbps</div></div>
+          <div class="sensor-card"><div class="s-val" id="scr-ori">—</div><div class="s-lbl">Orientation</div></div>
+          <div class="sensor-card"><div class="s-val" id="scr-size">—</div><div class="s-lbl">Screen px</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div><!-- /shell -->
 
 <script>
@@ -747,6 +872,7 @@ function openApp(id) {
   if (id === 'clock') startClock();
   if (id === 'color') updateColor();
   if (id === 'unit') initUnits();
+  if (id === 'sensors') initSensors();
 }
 function closeApp() {
   if (!currentApp) return;
@@ -1058,6 +1184,170 @@ function swapUnits() {
   fs.value=tv; ts.value=fv;
   document.getElementById('unit-from-val').value=document.getElementById('unit-to-val').value||fval;
   convertUnits();
+}
+
+/* ══════════════════════════════════════════
+   SENSORS
+══════════════════════════════════════════ */
+let motionActive = false, sensorsInited = false;
+
+function initSensors() {
+  if (sensorsInited) return;
+  sensorsInited = true;
+  updateDeviceInfo();
+
+  // Battery
+  if (navigator.getBattery) {
+    navigator.getBattery().then(bat => {
+      updateBattery(bat);
+      bat.addEventListener('chargingchange', () => updateBattery(bat));
+      bat.addEventListener('levelchange',    () => updateBattery(bat));
+    });
+  }
+
+  // Network
+  if (navigator.connection) {
+    updateNetwork();
+    navigator.connection.addEventListener('change', updateNetwork);
+  }
+
+  // Screen orientation changes
+  window.addEventListener('orientationchange', updateScreenOri);
+  window.addEventListener('resize', updateScreenOri);
+
+  // Try auto-start motion (works on Android without a permission prompt)
+  tryAutoMotion();
+}
+
+function tryAutoMotion() {
+  // If event fires at all, we have access without asking
+  const probe = e => {
+    if (e.acceleration || e.accelerationIncludingGravity) {
+      window.removeEventListener('devicemotion', probe);
+      onMotionGranted();
+    }
+  };
+  window.addEventListener('devicemotion', probe);
+  setTimeout(() => {
+    window.removeEventListener('devicemotion', probe);
+    if (!motionActive) {
+      document.getElementById('motion-status').textContent =
+        'Tap button to enable (iOS requires a user gesture)';
+    }
+  }, 800);
+}
+
+function requestMotionPerm() {
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    // iOS 13+
+    DeviceMotionEvent.requestPermission().then(state => {
+      if (state === 'granted') onMotionGranted();
+      else document.getElementById('motion-status').textContent = 'Permission denied';
+    }).catch(() => {
+      document.getElementById('motion-status').textContent = 'Permission error';
+    });
+  } else {
+    // Android / desktop — just attach
+    onMotionGranted();
+  }
+}
+
+function onMotionGranted() {
+  motionActive = true;
+  document.getElementById('motion-perm-btn').style.display = 'none';
+  document.getElementById('motion-status').textContent = '● Live';
+  document.getElementById('motion-status').className = 'sensor-status sensor-active';
+  document.getElementById('motion-data').style.display = 'block';
+  window.addEventListener('devicemotion',      handleMotion);
+  window.addEventListener('deviceorientation', handleOrientation);
+}
+
+function handleMotion(e) {
+  const acc = e.accelerationIncludingGravity || e.acceleration || {};
+  const rot = e.rotationRate || {};
+  const x = +(acc.x || 0).toFixed(2);
+  const y = +(acc.y || 0).toFixed(2);
+  const z = +(acc.z || 0).toFixed(2);
+
+  document.getElementById('acc-x-val').textContent = x;
+  document.getElementById('acc-y-val').textContent = y;
+  document.getElementById('acc-z-val').textContent = z;
+
+  // Map -20..20 → 0..100 %
+  const toBar = v => Math.min(100, Math.max(0, (v + 20) / 40 * 100));
+  document.getElementById('acc-x-bar').style.width = toBar(x) + '%';
+  document.getElementById('acc-y-bar').style.width = toBar(y) + '%';
+  document.getElementById('acc-z-bar').style.width = toBar(z) + '%';
+
+  const rAlpha = rot.alpha != null ? Math.abs(rot.alpha).toFixed(1) : '—';
+  document.getElementById('rot-rate').textContent = rAlpha;
+}
+
+function handleOrientation(e) {
+  if (e.alpha != null) document.getElementById('ori-alpha').textContent = Math.round(e.alpha) + '°';
+  if (e.beta  != null) document.getElementById('ori-beta').textContent  = Math.round(e.beta)  + '°';
+  if (e.gamma != null) document.getElementById('ori-gamma').textContent = Math.round(e.gamma) + '°';
+
+  // Bubble level
+  const beta  = e.beta  || 0;   // -180..180 front/back
+  const gamma = e.gamma || 0;   // -90..90   left/right
+  const ball  = document.getElementById('bubble-ball');
+  const wrap  = document.getElementById('bubble-ball')?.parentElement;
+  if (!ball || !wrap) return;
+  const r = wrap.offsetWidth / 2 - 18;
+  const bx = Math.max(-r, Math.min(r, (gamma / 30) * r));
+  const by = Math.max(-r, Math.min(r, (beta  / 30) * r));
+  ball.style.transform = `translate(calc(-50% + ${bx}px), calc(-50% + ${by}px))`;
+  // Green → red as tilt increases
+  const tilt = Math.sqrt(bx*bx + by*by) / (r || 1);
+  const g = Math.round(209 * (1 - tilt));
+  const rv = Math.round(255 * tilt);
+  ball.style.background = `radial-gradient(circle at 35% 35%, rgb(${rv},${g},80), rgb(${Math.round(rv*.6)},${Math.round(g*.6)},40))`;
+}
+
+function requestGPS() {
+  const btn = document.getElementById('gps-btn');
+  btn.textContent = 'Locating…';
+  if (!navigator.geolocation) {
+    btn.textContent = 'GPS not available'; return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const c = pos.coords;
+    document.getElementById('gps-lat').textContent = c.latitude.toFixed(5);
+    document.getElementById('gps-lon').textContent = c.longitude.toFixed(5);
+    document.getElementById('gps-acc').textContent = Math.round(c.accuracy);
+    document.getElementById('gps-alt').textContent = c.altitude != null ? c.altitude.toFixed(1) : '—';
+    document.getElementById('gps-spd').textContent = c.speed    != null ? c.speed.toFixed(2)    : '—';
+    document.getElementById('gps-hdg').textContent = c.heading  != null ? Math.round(c.heading) + '°' : '—';
+    btn.textContent = 'Refresh';
+  }, err => {
+    btn.textContent = 'Retry';
+    document.getElementById('gps-lat').textContent = 'Denied';
+  }, { enableHighAccuracy: true, timeout: 12000 });
+}
+
+function updateBattery(bat) {
+  document.getElementById('bat-level').textContent  = Math.round(bat.level * 100) + '%';
+  document.getElementById('bat-charge').textContent = bat.charging ? '⚡ Yes' : 'No';
+}
+
+function updateNetwork() {
+  const c = navigator.connection;
+  document.getElementById('net-type').textContent  = c.effectiveType || c.type || '—';
+  document.getElementById('net-speed').textContent = c.downlink != null ? c.downlink : '—';
+}
+
+function updateDeviceInfo() {
+  document.getElementById('scr-size').textContent = `${screen.width}×${screen.height}`;
+  updateScreenOri();
+}
+
+function updateScreenOri() {
+  const ori = window.screen.orientation;
+  document.getElementById('scr-ori').textContent = ori
+    ? ori.type.split('-')[0]
+    : (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait');
 }
 </script>
 </body>
