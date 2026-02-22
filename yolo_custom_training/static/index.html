@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLO Custom Object Detector</title>
+  <style>
+    /* ── Reset & base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d0f18;
+      color: #dde1f0;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      background: #13162b;
+      border-bottom: 1px solid #232745;
+      padding: 14px 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; color: #fff; }
+    header p  { font-size: 12px; color: #7a82a8; }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 14px;
+      padding: 14px;
+      max-width: 1220px;
+      margin: 0 auto;
+    }
+
+    /* ── Camera panel ───────────────────────────────────────────────────── */
+    .cam-panel {
+      background: #13162b;
+      border: 1px solid #232745;
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cam-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid #232745;
+    }
+
+    /* status pill */
+    .status-pill {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: #9aa3c8;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    .dot.live     { background: #f87171; animation: blink 1.2s infinite; }
+    .dot.annotate { background: #60a5fa; }
+    .dot.train    { background: #fbbf24; animation: blink .8s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    /* model badge */
+    .model-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 3px 9px; border-radius: 4px;
+      background: #1e2240; color: #7a82a8;
+      transition: all .2s;
+    }
+    .model-badge.custom { background: #0e2e1e; color: #4ade80; }
+
+    /* canvas stack */
+    .canvas-wrap {
+      position: relative;
+      flex: 1;
+      background: #000;
+      min-height: 340px;
+    }
+    video, canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+    #ann-canvas { cursor: crosshair; }
+
+    /* camera footer */
+    .cam-footer {
+      display: flex; gap: 8px; align-items: center;
+      padding: 10px 14px;
+      border-top: 1px solid #232745;
+    }
+    .spacer { flex: 1; }
+
+    /* ── Right column ───────────────────────────────────────────────────── */
+    .sidebar {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────────────── */
+    .card {
+      background: #13162b;
+      border: 1px solid #232745;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 9px 14px;
+      border-bottom: 1px solid #232745;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px;
+      color: #7a82a8;
+    }
+    .card-body { padding: 14px; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 7px 14px;
+      border-radius: 6px; border: none;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      transition: filter .15s, opacity .15s;
+      white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.12); }
+    .btn:disabled { opacity: .38; cursor: default; }
+    .btn-indigo  { background: #4f46e5; color: #fff; }
+    .btn-slate   { background: #232745; color: #c5cae9; }
+    .btn-emerald { background: #059669; color: #fff; }
+    .btn-red     { background: #b91c1c; color: #fff; }
+    .btn-sm      { padding: 4px 9px; font-size: 11px; }
+    .btn-full    { width: 100%; }
+
+    /* ── Mode toggle ─────────────────────────────────────────────────────── */
+    .toggle-row {
+      display: flex; gap: 4px;
+      background: #0d0f18; border-radius: 7px; padding: 3px;
+    }
+    .toggle-row button {
+      flex: 1; padding: 7px 6px;
+      border-radius: 5px; border: none;
+      background: transparent; color: #7a82a8;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    .toggle-row button.active { background: #4f46e5; color: #fff; }
+
+    /* ── Label row ───────────────────────────────────────────────────────── */
+    .label-row {
+      display: flex; gap: 6px; margin-top: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      background: #0d0f18; border: 1px solid #232745;
+      border-radius: 6px; padding: 7px 10px;
+      color: #dde1f0; font-size: 12px;
+    }
+    input[type="text"]:focus {
+      outline: none; border-color: #4f46e5;
+    }
+
+    /* ── Annotation list ─────────────────────────────────────────────────── */
+    .ann-list { max-height: 180px; overflow-y: auto; }
+    .ann-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 0;
+      border-bottom: 1px solid #1c1f38;
+      font-size: 12px;
+    }
+    .ann-item:last-child { border-bottom: none; }
+    .chip {
+      padding: 2px 8px; border-radius: 4px;
+      font-size: 10px; font-weight: 700;
+    }
+    .ann-item .ml-auto { margin-left: auto; }
+
+    /* ── Stats ───────────────────────────────────────────────────────────── */
+    .stat { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+    .stat-lbl { color: #7a82a8; }
+    .stat-val { font-weight: 700; }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .tag  { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+
+    /* ── Progress ────────────────────────────────────────────────────────── */
+    .epoch-row {
+      display: flex; align-items: center; gap: 10px; margin: 10px 0;
+    }
+    .epoch-row label { font-size: 11px; color: #7a82a8; white-space: nowrap; }
+    input[type="range"] { flex: 1; accent-color: #4f46e5; }
+    .epoch-val { font-size: 13px; font-weight: 700; min-width: 26px; text-align: right; }
+
+    .prog-bar  { background: #0d0f18; border-radius: 5px; height: 7px; overflow: hidden; margin: 8px 0 4px; }
+    .prog-fill {
+      height: 100%; border-radius: 5px;
+      background: linear-gradient(90deg, #4f46e5, #7c3aed);
+      transition: width .5s ease;
+    }
+    .prog-msg { font-size: 11px; color: #7a82a8; }
+
+    /* ── How-to ──────────────────────────────────────────────────────────── */
+    .how-to { font-size: 11px; color: #5a6180; line-height: 1.7; }
+    .how-to li { margin-left: 14px; }
+    .how-to strong { color: #9aa3c8; }
+
+    /* ── Notification ────────────────────────────────────────────────────── */
+    #notif {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #13162b; border: 1px solid #232745;
+      border-radius: 8px; padding: 10px 16px;
+      font-size: 12px; opacity: 0;
+      transition: opacity .25s; pointer-events: none; z-index: 999;
+    }
+    #notif.show { opacity: 1; }
+    #notif.ok  { border-color: #059669; color: #4ade80; }
+    #notif.err { border-color: #b91c1c; color: #f87171; }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: #232745; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>YOLO Custom Object Detector</h1>
+  <p>Capture frames &rarr; draw bounding boxes &rarr; fine-tune YOLOv8 on your custom classes</p>
+</header>
+
+<div class="layout">
+
+  <!-- ── Camera panel ── -->
+  <div class="cam-panel">
+    <div class="cam-toolbar">
+      <div class="status-pill">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-txt">Starting camera…</span>
+      </div>
+      <span class="model-badge" id="model-badge">yolov8n (COCO)</span>
+    </div>
+
+    <div class="canvas-wrap" id="canvas-wrap">
+      <video id="video" autoplay muted playsinline></video>
+      <!-- detection overlay (inference boxes) -->
+      <canvas id="det-canvas"></canvas>
+      <!-- annotation overlay (user-drawn boxes + captured frame) -->
+      <canvas id="ann-canvas"></canvas>
+    </div>
+
+    <div class="cam-footer">
+      <button class="btn btn-slate" id="btn-capture">Capture Frame</button>
+      <button class="btn btn-slate" id="btn-resume" disabled>Resume Live</button>
+      <div class="spacer"></div>
+      <button class="btn btn-slate btn-sm" id="btn-clear-canvas">Clear</button>
+    </div>
+  </div>
+
+  <!-- ── Right sidebar ── -->
+  <div class="sidebar">
+
+    <!-- Mode card -->
+    <div class="card">
+      <div class="card-head">Mode</div>
+      <div class="card-body">
+        <div class="toggle-row">
+          <button id="tab-infer"    class="active" onclick="app.setMode('inference')">&#x1F50D; Inference</button>
+          <button id="tab-annotate"             onclick="app.setMode('annotate')">&#x270F;&#xFE0F; Annotate</button>
+        </div>
+
+        <!-- annotate-only controls -->
+        <div id="ann-controls" style="display:none">
+          <div style="margin-top:10px;font-size:11px;color:#7a82a8;">
+            1. Capture frame &nbsp;&bull;&nbsp; 2. Draw box &nbsp;&bull;&nbsp; 3. Set label &nbsp;&bull;&nbsp; 4. Save
+          </div>
+          <div class="label-row">
+            <input type="text" id="label-input" placeholder='Label, e.g. "cat", "mug"' maxlength="30">
+            <button class="btn btn-slate" id="btn-set-label">Set</button>
+          </div>
+          <div class="label-row" style="margin-top:6px;">
+            <button class="btn btn-emerald btn-full" id="btn-save-frame" disabled>
+              Save Frame (0 boxes)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current frame boxes (annotate mode) -->
+    <div class="card" id="boxes-card" style="display:none">
+      <div class="card-head">Boxes on this frame</div>
+      <div class="card-body" style="padding:8px 14px;">
+        <div class="ann-list" id="ann-list">
+          <div style="color:#5a6180;font-size:12px;padding:6px 0;">No boxes yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dataset card -->
+    <div class="card">
+      <div class="card-head">Dataset</div>
+      <div class="card-body">
+        <div class="stat"><span class="stat-lbl">Saved frames</span><span class="stat-val" id="total-frames">0</span></div>
+        <div class="stat"><span class="stat-lbl">Classes</span><span class="stat-val" id="total-classes">—</span></div>
+        <div class="tags" id="class-tags"></div>
+        <div style="margin-top:10px;">
+          <button class="btn btn-red btn-sm" id="btn-clear-data">Clear Dataset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Training card -->
+    <div class="card">
+      <div class="card-head">Fine-Tune YOLOv8</div>
+      <div class="card-body">
+        <div class="epoch-row">
+          <label for="epoch-slider">Epochs</label>
+          <input type="range" id="epoch-slider" min="5" max="50" value="20">
+          <span class="epoch-val" id="epoch-val">20</span>
+        </div>
+        <button class="btn btn-indigo btn-full" id="btn-train" disabled>
+          Start Fine-Tuning
+        </button>
+        <div id="train-progress" style="display:none;margin-top:10px;">
+          <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+          <div class="prog-msg" id="prog-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How-to card -->
+    <div class="card">
+      <div class="card-head">How to Use</div>
+      <div class="card-body">
+        <ol class="how-to">
+          <li>Switch to <strong>Annotate</strong> mode</li>
+          <li>Click <strong>Capture Frame</strong></li>
+          <li>Click &amp; drag to draw a bounding box</li>
+          <li>Type a label and click <strong>Set</strong></li>
+          <li>Click <strong>Save Frame</strong></li>
+          <li>Repeat for ~10+ frames per class</li>
+          <li>Click <strong>Start Fine-Tuning</strong></li>
+          <li>Switch to <strong>Inference</strong> to test</li>
+        </ol>
+        <div style="margin-top:10px;font-size:10px;color:#3a4060;line-height:1.6;">
+          Labels are stored in YOLO format:<br>
+          <code style="color:#5a7080;">class_id&nbsp;xc&nbsp;yc&nbsp;w&nbsp;h</code> (all normalised 0-1)
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<div id="notif"></div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// Colour palette – one colour per custom class
+// ────────────────────────────────────────────────────────────────────────────
+const PALETTE = [
+  '#f87171','#fb923c','#facc15','#4ade80','#34d399',
+  '#22d3ee','#60a5fa','#a78bfa','#f472b6','#e879f9',
+];
+
+function classColor(label, classList) {
+  const i = classList.indexOf(label);
+  return PALETTE[(i >= 0 ? i : 0) % PALETTE.length];
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Notification helper
+// ────────────────────────────────────────────────────────────────────────────
+let _notifTimer = null;
+function notify(msg, type = 'ok') {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(() => { el.className = ''; }, 3200);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Main application
+// ────────────────────────────────────────────────────────────────────────────
+class YOLOApp {
+  constructor() {
+    // state
+    this.mode          = 'inference';
+    this.isLive        = true;
+    this.capturedURL   = null;   // data-URL of the frozen frame
+
+    this.boxes         = [];     // annotations on the current captured frame
+    this.currentLabel  = '';
+
+    this.drawing       = false;
+    this.drawStart     = { x: 0, y: 0 };
+    this.drawEnd       = { x: 0, y: 0 };
+
+    this.inferBoxes    = [];     // latest /infer response
+    this.allClasses    = [];     // server-tracked class list
+    this.usingCustom   = false;
+
+    // DOM
+    this.video      = document.getElementById('video');
+    this.detCanvas  = document.getElementById('det-canvas');
+    this.detCtx     = this.detCanvas.getContext('2d');
+    this.annCanvas  = document.getElementById('ann-canvas');
+    this.annCtx     = this.annCanvas.getContext('2d');
+
+    this._init();
+  }
+
+  // ── Initialisation ────────────────────────────────────────────────────────
+  async _init() {
+    await this._startCamera();
+    this._bindButtons();
+    this._bindCanvas();
+    this._inferLoop();
+    this._pollTraining();
+    this._refreshDataset();
+  }
+
+  // ── Camera ────────────────────────────────────────────────────────────────
+  async _startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      this.video.srcObject = stream;
+      await new Promise(r => { this.video.onloadedmetadata = r; });
+
+      const w = this.video.videoWidth;
+      const h = this.video.videoHeight;
+      [this.detCanvas, this.annCanvas].forEach(c => { c.width = w; c.height = h; });
+
+      this._setStatus('live', 'Live · Inference');
+    } catch (err) {
+      this._setStatus('error', `Camera error: ${err.message}`);
+    }
+  }
+
+  _setStatus(type, msg) {
+    const dot = document.getElementById('status-dot');
+    dot.className = 'dot';
+    if (type === 'live')     dot.classList.add('live');
+    if (type === 'annotate') dot.classList.add('annotate');
+    if (type === 'train')    dot.classList.add('train');
+    document.getElementById('status-txt').textContent = msg;
+  }
+
+  // ── Mode switching ────────────────────────────────────────────────────────
+  setMode(mode) {
+    this.mode = mode;
+
+    document.getElementById('tab-infer').classList.toggle('active',    mode === 'inference');
+    document.getElementById('tab-annotate').classList.toggle('active', mode === 'annotate');
+
+    const annControls = document.getElementById('ann-controls');
+    const boxesCard   = document.getElementById('boxes-card');
+
+    if (mode === 'annotate') {
+      annControls.style.display = 'block';
+      boxesCard.style.display   = 'block';
+      this.annCanvas.style.pointerEvents = 'auto';
+      this._setStatus('annotate', 'Annotate · Capture a frame');
+      if (this.isLive) this._captureFrame();
+    } else {
+      annControls.style.display = 'none';
+      boxesCard.style.display   = 'none';
+      this.annCanvas.style.pointerEvents = 'none';
+      this._resumeLive();
+    }
+  }
+
+  // ── Frame capture / resume ────────────────────────────────────────────────
+  _captureFrame() {
+    if (!this.video.videoWidth) return;
+
+    const w = this.detCanvas.width, h = this.detCanvas.height;
+    const tmp = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    tmp.getContext('2d').drawImage(this.video, 0, 0, w, h);
+    this.capturedURL = tmp.toDataURL('image/jpeg', 0.92);
+    this.isLive = false;
+
+    this._redrawAnn();
+    document.getElementById('btn-capture').disabled = true;
+    document.getElementById('btn-resume').disabled  = false;
+    this._setStatus('annotate', 'Frame captured · Draw boxes');
+  }
+
+  _resumeLive() {
+    this.isLive      = true;
+    this.capturedURL = null;
+    this.boxes       = [];
+    this.annCtx.clearRect(0, 0, this.annCanvas.width, this.annCanvas.height);
+    this._updateBoxList();
+    this._updateSaveBtn();
+
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('btn-resume').disabled  = true;
+
+    this._setStatus('live', 'Live · Inference');
+  }
+
+  // ── Inference loop ────────────────────────────────────────────────────────
+  _inferLoop() {
+    let busy = false;
+    const tick = async () => {
+      if (!busy && this.mode === 'inference' && this.isLive && this.video.videoWidth) {
+        busy = true;
+        try { await this._runInfer(); } catch (_) { /* server not ready yet */ }
+        busy = false;
+      }
+      setTimeout(tick, 500);  // ~2 FPS keeps the UI snappy
+    };
+    setTimeout(tick, 1200);
+  }
+
+  async _runInfer() {
+    const w = this.detCanvas.width, h = this.detCanvas.height;
+    const tmp = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    tmp.getContext('2d').drawImage(this.video, 0, 0, w, h);
+    const dataURL = tmp.toDataURL('image/jpeg', 0.75);
+
+    const res  = await fetch('/infer', _post({ image: dataURL }));
+    if (!res.ok) return;
+    const data = await res.json();
+
+    this.inferBoxes   = data.detections;
+    this.usingCustom  = data.model !== 'yolov8n';
+
+    const badge = document.getElementById('model-badge');
+    badge.textContent = this.usingCustom ? 'Custom Model' : 'yolov8n (COCO)';
+    badge.className   = this.usingCustom ? 'model-badge custom' : 'model-badge';
+
+    this._drawInferBoxes();
+  }
+
+  _drawInferBoxes() {
+    const ctx = this.detCtx;
+    const w   = this.detCanvas.width;
+    const h   = this.detCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    for (const b of this.inferBoxes) {
+      const x1 = b.x1 * w, y1 = b.y1 * h;
+      const bw  = (b.x2 - b.x1) * w;
+      const bh  = (b.y2 - b.y1) * h;
+      const col = classColor(b.label, this.allClasses);
+
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 2;
+      ctx.strokeRect(x1, y1, bw, bh);
+
+      const tag  = `${b.label} ${Math.round(b.confidence * 100)}%`;
+      ctx.font   = '11px monospace';
+      const tw   = ctx.measureText(tag).width;
+      const ly   = y1 > 18 ? y1 : y1 + bh;
+
+      ctx.fillStyle = col + 'cc';
+      ctx.fillRect(x1, ly - 16, tw + 8, 17);
+      ctx.fillStyle = '#000';
+      ctx.fillText(tag, x1 + 4, ly - 3);
+    }
+  }
+
+  // ── Canvas drawing (annotation) ───────────────────────────────────────────
+  _bindCanvas() {
+    const cvs = this.annCanvas;
+    const fix = e => {
+      const r = cvs.getBoundingClientRect();
+      return {
+        x: (e.clientX - r.left) * cvs.width  / r.width,
+        y: (e.clientY - r.top)  * cvs.height / r.height,
+      };
+    };
+
+    cvs.addEventListener('mousedown', e => {
+      if (this.mode !== 'annotate' || this.isLive) return;
+      this.drawing   = true;
+      this.drawStart = fix(e);
+      this.drawEnd   = fix(e);
+    });
+
+    cvs.addEventListener('mousemove', e => {
+      if (!this.drawing) return;
+      this.drawEnd = fix(e);
+      this._redrawAnn();
+      this._drawGhost();
+    });
+
+    cvs.addEventListener('mouseup', e => {
+      if (!this.drawing) return;
+      this.drawing = false;
+      this.drawEnd = fix(e);
+
+      const x1 = Math.min(this.drawStart.x, this.drawEnd.x);
+      const y1 = Math.min(this.drawStart.y, this.drawEnd.y);
+      const x2 = Math.max(this.drawStart.x, this.drawEnd.x);
+      const y2 = Math.max(this.drawStart.y, this.drawEnd.y);
+
+      if (x2 - x1 < 8 || y2 - y1 < 8) { this._redrawAnn(); return; }
+
+      const label = this.currentLabel || document.getElementById('label-input').value.trim();
+      if (!label) {
+        notify('Set a label first, then draw a box.', 'err');
+        this._redrawAnn();
+        return;
+      }
+
+      this.boxes.push({ label, x1, y1, x2, y2 });
+      this._redrawAnn();
+      this._updateBoxList();
+      this._updateSaveBtn();
+    });
+
+    // touch support
+    const t2m = e => {
+      const t = e.touches[0] || e.changedTouches[0];
+      return { clientX: t.clientX, clientY: t.clientY };
+    };
+    cvs.addEventListener('touchstart', e => { e.preventDefault(); cvs.dispatchEvent(new MouseEvent('mousedown', t2m(e))); });
+    cvs.addEventListener('touchmove',  e => { e.preventDefault(); cvs.dispatchEvent(new MouseEvent('mousemove',  t2m(e))); });
+    cvs.addEventListener('touchend',   e => { e.preventDefault(); cvs.dispatchEvent(new MouseEvent('mouseup',    t2m(e))); });
+  }
+
+  _drawGhost() {
+    const ctx = this.annCtx;
+    const x1 = Math.min(this.drawStart.x, this.drawEnd.x);
+    const y1 = Math.min(this.drawStart.y, this.drawEnd.y);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(x1, y1,
+      Math.abs(this.drawEnd.x - this.drawStart.x),
+      Math.abs(this.drawEnd.y - this.drawStart.y));
+    ctx.setLineDash([]);
+  }
+
+  _redrawAnn() {
+    const ctx = this.annCtx;
+    ctx.clearRect(0, 0, this.annCanvas.width, this.annCanvas.height);
+    if (!this.capturedURL) return;
+
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0);
+      // saved boxes
+      const uniqueLabels = [...new Set(this.boxes.map(b => b.label))];
+      for (const b of this.boxes) {
+        const col = classColor(b.label, uniqueLabels);
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([]);
+        ctx.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+
+        ctx.font = '11px monospace';
+        const tw = ctx.measureText(b.label).width;
+        ctx.fillStyle = col + 'cc';
+        ctx.fillRect(b.x1, b.y1 - 16, tw + 8, 17);
+        ctx.fillStyle = '#000';
+        ctx.fillText(b.label, b.x1 + 4, b.y1 - 3);
+      }
+    };
+    img.src = this.capturedURL;
+  }
+
+  // ── Box list UI ───────────────────────────────────────────────────────────
+  _updateBoxList() {
+    const el = document.getElementById('ann-list');
+    if (!this.boxes.length) {
+      el.innerHTML = '<div style="color:#5a6180;font-size:12px;padding:6px 0;">No boxes yet</div>';
+      return;
+    }
+    const uq = [...new Set(this.boxes.map(b => b.label))];
+    el.innerHTML = this.boxes.map((b, i) => {
+      const col = classColor(b.label, uq);
+      return `<div class="ann-item">
+        <span class="chip" style="background:${col}22;color:${col};">${b.label}</span>
+        <span style="color:#5a6180;">${Math.round(b.x2-b.x1)}&times;${Math.round(b.y2-b.y1)}px</span>
+        <span class="ml-auto">
+          <button class="btn btn-red btn-sm" onclick="app._removeBox(${i})">&#x2715;</button>
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  _removeBox(i) {
+    this.boxes.splice(i, 1);
+    this._redrawAnn();
+    this._updateBoxList();
+    this._updateSaveBtn();
+  }
+
+  _updateSaveBtn() {
+    const btn = document.getElementById('btn-save-frame');
+    const n   = this.boxes.length;
+    btn.textContent = n ? `Save Frame (${n} box${n>1?'es':''})` : 'Save Frame';
+    btn.disabled    = n === 0 || this.isLive;
+  }
+
+  // ── Save annotation ───────────────────────────────────────────────────────
+  async _saveFrame() {
+    if (!this.capturedURL || !this.boxes.length) return;
+    const W = this.annCanvas.width;
+    const H = this.annCanvas.height;
+
+    const payload = {
+      image: this.capturedURL,
+      annotations: this.boxes.map(b => ({
+        label:    b.label,
+        x_center: ((b.x1 + b.x2) / 2) / W,
+        y_center: ((b.y1 + b.y2) / 2) / H,
+        width:    (b.x2 - b.x1) / W,
+        height:   (b.y2 - b.y1) / H,
+      })),
+    };
+
+    try {
+      const res  = await fetch('/save_annotation', _post(payload));
+      const data = await res.json();
+      if (data.saved) {
+        notify(`Saved! Dataset: ${data.total_annotations} frame${data.total_annotations>1?'s':''}`);
+        this.allClasses = data.classes;
+        this.boxes      = [];
+        this._updateBoxList();
+        this._updateSaveBtn();
+        this._refreshDataset();
+        // Auto-capture next frame
+        setTimeout(() => this._captureFrame(), 350);
+      } else {
+        notify(data.error || 'Save failed', 'err');
+      }
+    } catch (err) {
+      notify('Network error while saving', 'err');
+    }
+  }
+
+  // ── Dataset info ──────────────────────────────────────────────────────────
+  async _refreshDataset() {
+    try {
+      const res  = await fetch('/annotations_info');
+      const data = await res.json();
+      this.allClasses = data.classes;
+
+      document.getElementById('total-frames').textContent  = data.total;
+      document.getElementById('total-classes').textContent = data.classes.length || '—';
+
+      const tagsEl = document.getElementById('class-tags');
+      tagsEl.innerHTML = data.classes.map((c, i) => {
+        const col = PALETTE[i % PALETTE.length];
+        return `<span class="tag" style="background:${col}22;color:${col};">${c}</span>`;
+      }).join('');
+
+      const trainBtn = document.getElementById('btn-train');
+      trainBtn.disabled = data.total < 5 || !data.classes.length;
+      if (data.total > 0 && data.total < 5)
+        trainBtn.title = `Need at least 5 frames (have ${data.total})`;
+    } catch (_) { /* server starting */ }
+  }
+
+  // ── Training ──────────────────────────────────────────────────────────────
+  async _startTraining() {
+    const epochs = +document.getElementById('epoch-slider').value;
+    try {
+      const res  = await fetch('/train', _post({ epochs }));
+      const data = await res.json();
+      if (data.error) {
+        notify(data.error, 'err');
+      } else {
+        notify('Fine-tuning started!');
+        document.getElementById('train-progress').style.display = 'block';
+        document.getElementById('btn-train').disabled = true;
+        this._setStatus('train', 'Training…');
+      }
+    } catch (_) {
+      notify('Could not reach server', 'err');
+    }
+  }
+
+  _pollTraining() {
+    setInterval(async () => {
+      try {
+        const res  = await fetch('/train_status');
+        const data = await res.json();
+
+        if (data.running || data.progress > 0) {
+          document.getElementById('train-progress').style.display = 'block';
+          document.getElementById('prog-fill').style.width = data.progress + '%';
+          document.getElementById('prog-msg').textContent  = data.message;
+
+          if (!data.running && data.progress === 100) {
+            this.usingCustom = true;
+            const badge = document.getElementById('model-badge');
+            badge.textContent = 'Custom Model'; badge.className = 'model-badge custom';
+            this._setStatus('live', 'Live · Custom Model Active');
+            notify('Training complete! Custom model is now active.', 'ok');
+          }
+        }
+
+        if (!data.running) {
+          const n = +(document.getElementById('total-frames').textContent);
+          document.getElementById('btn-train').disabled = n < 5 || !this.allClasses.length;
+          if (data.progress > 0)
+            this._setStatus('live', 'Live · ' + (this.usingCustom ? 'Custom Model' : 'Inference'));
+        }
+      } catch (_) { /* server may still be starting */ }
+    }, 2000);
+  }
+
+  // ── Button wiring ─────────────────────────────────────────────────────────
+  _bindButtons() {
+    document.getElementById('btn-capture').onclick      = () => this._captureFrame();
+    document.getElementById('btn-resume').onclick       = () => { this._resumeLive(); };
+    document.getElementById('btn-clear-canvas').onclick = () => {
+      this.boxes = [];
+      this.annCtx.clearRect(0, 0, this.annCanvas.width, this.annCanvas.height);
+      this._updateBoxList(); this._updateSaveBtn();
+    };
+
+    document.getElementById('btn-set-label').onclick = () => {
+      const v = document.getElementById('label-input').value.trim();
+      if (v) { this.currentLabel = v; notify(`Label set: "${v}"`); }
+    };
+    document.getElementById('label-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btn-set-label').click();
+    });
+
+    document.getElementById('btn-save-frame').onclick = () => this._saveFrame();
+
+    document.getElementById('btn-clear-data').onclick = async () => {
+      if (!confirm('Delete all saved frames and annotations? Cannot be undone.')) return;
+      const res = await fetch('/clear_data', { method: 'POST' });
+      if ((await res.json()).cleared) {
+        this.allClasses = []; this.usingCustom = false;
+        this._refreshDataset();
+        document.getElementById('train-progress').style.display = 'none';
+        document.getElementById('prog-fill').style.width = '0%';
+        document.getElementById('model-badge').textContent = 'yolov8n (COCO)';
+        document.getElementById('model-badge').className  = 'model-badge';
+        notify('Dataset cleared');
+      }
+    };
+
+    document.getElementById('btn-train').onclick = () => this._startTraining();
+    document.getElementById('epoch-slider').oninput = e => {
+      document.getElementById('epoch-val').textContent = e.target.value;
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tiny helper
+// ────────────────────────────────────────────────────────────────────────────
+function _post(body) {
+  return { method: 'POST', headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(body) };
+}
+
+// Boot
+const app = new YOLOApp();
+</script>
+</body>
+</html>
